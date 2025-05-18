@@ -30,7 +30,7 @@ experience.name.OnChanged += newName => Debug.Log("New name: " + newName);
 ```
 
 ## 📘 Documentation
-[![Docs](https://img.shields.io/badge/docs-online-blue)](https://KevinFernandesDev.github.io/reacs)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
 
 ## License
 No License
