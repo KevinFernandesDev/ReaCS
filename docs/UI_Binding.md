@@ -1,0 +1,11 @@
+# UI Toolkit Binding
+
+You can bind `ObservableScriptableObject` fields to Unity UI Toolkit elements using:
+
+- Manual `OnChanged` subscription
+- Unity's new runtime data binding system (Unity 2023.2+)
+
+```csharp
+label.bindingPath = "playerScore";
+label.Bind(new SerializedObject(myScriptableObject));
+```

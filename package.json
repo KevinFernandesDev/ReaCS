@@ -1,0 +1,14 @@
+{
+  "name": "com.yourcompany.reacs",
+  "version": "1.0.0",
+  "displayName": "ReaCS - Reactive Component System",
+  "description": "A lightweight ECS-inspired reactive data model using ScriptableObjects.",
+  "unity": "2021.3",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://github.com/yourusername/reacs"
+  },
+  "keywords": ["ecs", "reactive", "scriptableobject", "data", "unity"],
+  "type": "library"
+}
