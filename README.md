@@ -33,7 +33,6 @@ experience.name.OnChanged += newName => Debug.Log("New name: " + newName);
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
 
 ## 🔎 Code Coverage
-[[![alt text](https://github.com/KevinFernandesDev/ReaCS/badge_linecoverage.png "Test Coverage")](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_shieldsio_linecoverage_blue.svg)
-](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_shieldsio_linecoverage_blue.svg)
+[![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
 ## License
 No License
