@@ -9,7 +9,9 @@ ReaCS is a lightweight Reactive ECS-inspired architecture that uses Observable d
 - [x] Custom drawer for Inspector usability
 - [x] Works with Unity's UI Toolkit and data binding
 - [x] Supports two-way bindings via ScriptableObjects
-
+- [x] Battle-tested for complex projects
+- [x] Covered by Unity's tests & Coverage tool (dependencies)
+      
 ## Usage
 1. Add the package via Git in your Unity project:
 ```json
