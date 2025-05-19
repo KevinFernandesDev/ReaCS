@@ -1,26 +1,30 @@
 #if UNITY_EDITOR
+using ReaCS.Runtime;
 using UnityEditor;
 using UnityEngine;
 
-[CustomPropertyDrawer(typeof(Observable<>))]
-public class ObservableDrawer : PropertyDrawer
+namespace ReaCS.Editor
 {
-    public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+    [CustomPropertyDrawer(typeof(Observable<>))]
+    public class ObservableDrawer : PropertyDrawer
     {
-        var valueProp = property.FindPropertyRelative("value");
-        if (valueProp == null)
+        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            EditorGUI.LabelField(position, label.text, "Unsupported type");
-            return;
+            var valueProp = property.FindPropertyRelative("value");
+            if (valueProp == null)
+            {
+                EditorGUI.LabelField(position, label.text, "Unsupported type");
+                return;
+            }
+
+            EditorGUI.PropertyField(position, valueProp, label, true);
         }
 
-        EditorGUI.PropertyField(position, valueProp, label, true);
+        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+        {
+            var valueProp = property.FindPropertyRelative("value");
+            return EditorGUI.GetPropertyHeight(valueProp, label, true);
+        }
     }
-
-    public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-    {
-        var valueProp = property.FindPropertyRelative("value");
-        return EditorGUI.GetPropertyHeight(valueProp, label, true);
-    }
-}
 #endif
+}

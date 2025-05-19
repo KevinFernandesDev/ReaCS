@@ -1,0 +1,17 @@
+{
+    "name": "ReaCS.Tests.Shared",
+    "rootNamespace": "",
+    "references": [
+        "GUID:b3f1d54100f34c049a2c7427d7162c85",
+        "GUID:2e52984c536763347a2699c7cdcea854"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

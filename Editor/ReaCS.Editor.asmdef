@@ -1,0 +1,8 @@
+{
+	"name": "ReaCS.Editor",
+	"rootNamespace": "ReaCS.Editor",
+	"references": [
+		"ReaCS.Runtime"
+		],
+	"includePlatforms": ["Editor"]
+}
