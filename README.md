@@ -47,8 +47,10 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ Custom graph-based debugging tool to inspect Systems, with
 
+
 ## 🔎 Code Coverage
 [![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
+
 
 ## #️⃣ Usage
 1. Add the package via Git in your Unity project:
@@ -77,8 +79,10 @@ public class ExperienceSelectSystem : SystemBase<ExperienceSO>
 }
 ```
 
+
 ## 📘 Documentation
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
+
 
 ## License
 No License
