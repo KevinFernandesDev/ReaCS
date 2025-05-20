@@ -59,7 +59,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 2. Create a ScriptableObject that extends `ObservableScriptableObject` and add Attribute `[Observable]` and `Observable<T>` to a field:
 ```csharp
 // Observable fields are still accessible in Inspector
-// thanks to custom a drawer editor script
+// thanks to a custom drawer editor script
 
 public class ExperienceSO : ObservableScriptableObject {
     [Observable] public Observable<string> name;
