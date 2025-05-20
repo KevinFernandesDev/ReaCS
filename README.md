@@ -27,7 +27,7 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ Clean declarative API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses
 
-✅ Works for designers using Unity regular workflow for data editing and addition of new data
+✅ Clean worfklow for for designers: Only use Unity's regular workflow for data edition/mutation and see changes immediately
 
 ✅ Easy to scale
 
