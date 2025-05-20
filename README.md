@@ -9,7 +9,7 @@ ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses O
 
 ✅ Close to zero boilerplate
 
-✅ Transparent Zero setup
+✅ Transparent zero setup
 
 ✅ No inheritance promoted (Reactive SO data-driven architecture)
 
