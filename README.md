@@ -7,9 +7,9 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ Guardrails by design
 
-✅ Close to zero boilerplate
-
 ✅ Transparent zero setup
+
+✅ Minimal boilerplate (compared to INotifyPropertyChanged for example)
 
 ✅ No inheritance promoted (Reactive SO data-driven architecture)
 
