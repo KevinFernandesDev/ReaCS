@@ -10,20 +10,35 @@ ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses O
 ✅ Close to zero boilerplate
 
 ✅ No inheritance (Reactive SO data-driven architecture)
+
 ✅ Enforced SRP (Single-Responsability Principal) with "Systems" 
+
 ✅ Enforces *only one SO* to react to
+
 ✅ Enforces *only one field* to track
+
 ✅ Centralized runtime watcher with debounce for performance
+
 ✅ Clean API for devs: no subscriptions, no events, cross-monobehavior  no string mistakes
+
 ✅ Works for designers using Unity regular workflow for data editing and addition of new data
+
 ✅ Easy to scale
+
 ✅ Easy to test
+
 ✅ Easy to debug (one system = one job)
+
 ✅ Easy to analyze, visualize, or extend later
+
 ✅ Easy to maintain
+
 ✅ Consistent architecture
+
 ✅ Covered by Unity Tests & Coverage tool (dependencies)
+
 ✅ Custom drawer for SO fields Inspector usability
+
 ✅ Custom graph-based debugging tool to inspect Systems, with
 
 ## 🔎 Code Coverage
