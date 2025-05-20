@@ -1,17 +1,31 @@
 # ReaCS - Reactive Component System for Unity
 
-ReaCS is a lightweight Reactive ECS-inspired architecture that uses Observable data with ScriptableObjects to enable automatic UI binding, reactivity, and clean separation of data and logic.
+ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses Observable data with ScriptableObjects to enable automatic UI binding, reactivity, and clean separation of data and logic with a state-as-truth behavior.
 
 ## Features
-- [x] Observable<T> with per-field OnChanged
-- [x] ObservableScriptableObject with dirty tracking
-- [x] Centralized runtime watcher with debounce for performance
-- [x] Custom drawer for Inspector usability
-- [x] Works with Unity's UI Toolkit and data binding
-- [x] Supports two-way bindings via ScriptableObjects
-- [x] Battle-tested for complex projects
-- [x] Covered by Unity Tests & Coverage tool (dependencies)
-      
+✅ State-as-truth
+✅ Guardrails by design
+✅ Close to zero boilerplate
+✅ No inheritance (Reactive SO data-driven architecture)
+✅ Enforced SRP (Single-Responsability Principal) with "Systems" 
+✅ Enforces *only one SO* to react to
+✅ Enforces *only one field* to track
+✅ Centralized runtime watcher with debounce for performance
+✅ Clean API for devs: no subscriptions, no events, cross-monobehavior  no string mistakes
+✅ Works for designers using Unity regular workflow for data editing and addition of new data
+✅ Easy to scale
+✅ Easy to test
+✅ Easy to debug (one system = one job)
+✅ Easy to analyze, visualize, or extend later
+✅ Easy to maintain
+✅ Consistent architecture
+✅ Covered by Unity Tests & Coverage tool (dependencies)
+✅ Custom drawer for SO fields Inspector usability
+✅ Custom graph-based debugging tool to inspect Systems, with
+
+## 🔎 Code Coverage
+[![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
+
 ## Usage
 1. Add the package via Git in your Unity project:
 ```json
@@ -26,15 +40,21 @@ public class ExperienceSO : ObservableScriptableObject {
 }
 ```
 
-3. In a MonoBehaviour, observe changes like this:
+3. In a Monobehavior inheriting from SystemBase, observe changes like this:
 ```csharp
-experience.name.OnChanged += newName => Debug.Log("New name: " + newName);
+[ReactTo(nameof(ExperienceSO.isSelected))]
+public class ExperienceSelectSystem : SystemBase<ExperienceSO>
+{
+    protected override void OnFieldChanged(ExperienceSO changedSO)
+    {
+            // Reacts only when any ExperienceSO's `isSelected` changes
+            experience.name.OnChanged += newName => Debug.Log("New name: " + newName);
+    }
+}
 ```
 
 ## 📘 Documentation
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
 
-## 🔎 Code Coverage
-[![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
 ## License
 No License
