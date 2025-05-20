@@ -13,7 +13,7 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ No inheritance promoted (Reactive SO data-driven architecture) compatible with interfaces when needed
 
-✅ Interfaces promoted for observable ScriptableObjects when needed
+✅ Promotes Interfaces for observable ScriptableObjects when needed
 
 ✅ Observables in ScriptableObjects baked in transparently behind the scenes
 
