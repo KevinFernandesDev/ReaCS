@@ -11,7 +11,7 @@ ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses O
 
 ✅ No inheritance (Reactive SO data-driven architecture)
 
-✅ Observables in ScriptableObjects baked in behind-the-scene
+✅ Observables in ScriptableObjects baked in transparently behind the scenes
 
 ✅ Enforced SRP (Single-Responsability Principal) with "Systems" 
 
