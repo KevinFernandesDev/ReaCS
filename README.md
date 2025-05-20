@@ -25,7 +25,7 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ Centralized runtime watcher with debounce for performance
 
-✅ Clean API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses, and no string mistakes
+✅ Clean declarative API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses
 
 ✅ Works for designers using Unity regular workflow for data editing and addition of new data
 
