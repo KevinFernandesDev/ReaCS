@@ -1,6 +1,6 @@
 # ReaCS - Reactive Component System for Unity
 
-ReaCS is an opiniated lightweight Reactive ECS/Data-Driven-inspired architecture that uses Observable data with ScriptableObjects to enable automatic UI binding, reactivity, and clean separation of data and logic with a state-as-truth behavior.
+ReaCS is an opiniated lightweight Reactive Data-Driven architecture that uses Observable data with ScriptableObjects to enable automatic UI binding, reactivity, and clean separation of data and logic with a state-as-truth behavior.
 
 ## Features
 ✅ State-as-truth
