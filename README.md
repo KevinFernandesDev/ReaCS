@@ -45,7 +45,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 <br> 
 
-## 🔎 Code Coverage
+## 🔎 Runtime Code Coverage
 [![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
 
 <br> 
