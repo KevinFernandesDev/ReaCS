@@ -46,12 +46,10 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 ✅ Custom drawer for SO fields Inspector usability
 
 ✅ Custom graph-based debugging tool to inspect Systems, with
-
-
+<br> 
 ## 🔎 Code Coverage
 [![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
-
-
+<br> 
 ## #️⃣ Usage
 1. Add the package via Git in your Unity project:
 ```json
@@ -78,11 +76,9 @@ public class ExperienceSelectSystem : SystemBase<ExperienceSO>
     }
 }
 ```
-
-
+<br> 
 ## 📘 Documentation
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
-
-
+<br> 
 ## License
 No License
