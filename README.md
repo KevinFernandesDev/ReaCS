@@ -19,7 +19,7 @@ ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses O
 
 ✅ Centralized runtime watcher with debounce for performance
 
-✅ Clean API for devs: no subscriptions, no events, cross-monobehavior  no string mistakes
+✅ Clean API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses, and no string mistakes
 
 ✅ Works for designers using Unity regular workflow for data editing and addition of new data
 
