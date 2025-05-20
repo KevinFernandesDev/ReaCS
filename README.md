@@ -71,7 +71,7 @@ public class ExperienceSO : ObservableScriptableObject {
 3. In a Monobehavior inheriting from SystemBase, observe changes like this:
 ```csharp
 [ReactTo(nameof(ExperienceSO.isSelected))]
-public class ExperienceSelectSystem : SystemBase<ExperienceSO>
+public class ExperienceSelectionSystem : SystemBase<ExperienceSO>
 {
     protected override void OnFieldChanged(ExperienceSO changedSO)
     {
