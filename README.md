@@ -3,6 +3,8 @@
 ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses Observable data with ScriptableObjects to enable automatic UI binding, reactivity, and clean separation of data and logic with a state-as-truth behavior in Unity's game engine.
 
 ## Features
+✅ Consistent architecture
+
 ✅ State-as-truth
 
 ✅ Guardrails by design
@@ -29,17 +31,11 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 
 ✅ Clean worfklow for for designers: Only use Unity's regular workflow for data edition/mutation and see changes immediately
 
-✅ Easy to scale
-
-✅ Easy to test
+✅ Easy to test, maintain, scale & extend
 
 ✅ Easy to debug (one system = one job)
 
-✅ Easy to analyze, visualize, or extend later
-
-✅ Easy to maintain
-
-✅ Consistent architecture
+✅ Easy to analyze (custom tools included to visualize data flow efficiently)
 
 ✅ Covered by Unity Tests & Coverage tool (dependencies)
 
