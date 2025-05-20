@@ -4,8 +4,11 @@ ReaCS is an opiniated lightweight Reactive ECS-inspired architecture that uses O
 
 ## Features
 ✅ State-as-truth
+
 ✅ Guardrails by design
+
 ✅ Close to zero boilerplate
+
 ✅ No inheritance (Reactive SO data-driven architecture)
 ✅ Enforced SRP (Single-Responsability Principal) with "Systems" 
 ✅ Enforces *only one SO* to react to
