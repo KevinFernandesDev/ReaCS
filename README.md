@@ -50,7 +50,7 @@ ReaCS is an opinionated lightweight Reactive Data-Driven Architecture that uses 
 ## 🔎 Code Coverage
 [![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
 
-## Usage
+## #️⃣ Usage
 1. Add the package via Git in your Unity project:
 ```json
 "com.kevinfernandes.reacs": "https://github.com/KevinFernandesDev/ReaCS.git"
