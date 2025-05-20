@@ -58,6 +58,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 2. Create a ScriptableObject that extends `ObservableScriptableObject` and add Attribute `[Observable]` and `Observable<T>` to a field:
 ```csharp
+// Observable fields are still accessible in Inspector thanks to custom drawer editor script
 public class ExperienceSO : ObservableScriptableObject {
     [Observable] public Observable<string> name;
     [Observable] public Observable<Sprite> icon;
@@ -66,6 +67,8 @@ public class ExperienceSO : ObservableScriptableObject {
 
 3. In a Monobehavior inheriting from SystemBase, observe changes like this:
 ```csharp
+// Select the ScriptableObject type and field you want to react to
+// Behavior automatically runs in OnFieldChanged (automatically filled via abstract method in SystemBase)
 [ReactTo(nameof(ExperienceSO.isSelected))]
 public class ExperienceSelectionSystem : SystemBase<ExperienceSO>
 {
