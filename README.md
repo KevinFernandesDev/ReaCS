@@ -91,8 +91,8 @@ public class ExperienceSelectionSystem : SystemBase<ExperienceSO>
 <br>
 
 ## 📘 ChatGPT Prompt
-> If you need help with getting around how to do something, you can use this chatGPT prompt to steer you in the right direction>  
-> Just click on the copy icon for easy access (it's within a code block for that purpose)
+> If you need help with getting around how to do something, you can use this chatGPT prompt to steer you in the right direction.</br>
+> Just click on the top-right copy icon in the code block for easy access.
 > 
 >⚠️ <b>Do not take the result as gospel!</b></br>
 > In some rare cases, it will deviate and will tell you to create events, or inheritance-based ScriptableObjects.</br>
