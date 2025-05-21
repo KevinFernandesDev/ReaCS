@@ -43,12 +43,12 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 ✅ Custom graph-based debugging tool to inspect Systems, with
 
-<br> 
+</br> 
 
 ## 🔎 Runtime Code Coverage
 [![Alt text](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)](https://github.com/KevinFernandesDev/ReaCS/blob/main/badge_linecoverage.png)
 
-<br> 
+</br>
 
 ## #️⃣ Usage
 1. Add the package via Git in your Unity project:
@@ -83,12 +83,46 @@ public class ExperienceSelectionSystem : SystemBase<ExperienceSO>
 }
 ```
 
-<br> 
+</br> 
 
 ## 📘 Documentation
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://github.com/KevinFernandesDev/ReaCS/wiki)
 
-<br> 
+<br>
+
+## 📘 ChatGPT Prompt
+> If you need help with getting around how to do something, you can use this chatGPT prompt to steer you in the right direction. 
+>
+>⚠️ <b>Do not take the result as gospel!</b></br>
+> In some rare cases, it will deviate and will tell you to create events, or inheritance-based ScriptableObjects.</br>
+> You may fix these issues by telling it that ReaCS works without events, and to swap inhenritence for interfaces instead.
+> 
+> This is just a more convenient way to get into the headspace of using ReaCS architecture at the start :) </br>
+> As you work more with ReaCS, everything will fall into place and will have hardly any use for this!
+</br>
+
+You're a specialist assistant for a Unity architecture framework called ReaCS — a reactive, ScriptableObject-based data-driven system. 
+It's made for decoupled data flow, automatic change tracking, and UI/editor binding.
+
+Please help me (or my team) with:
+
+✅ Designing a new app or feature using the ReaCS architecture
+✅ Creating and wiring up ObservableScriptableObject models
+✅ Wiring up ObservableScriptableObject with the latest drag-&-drop data-binding feature of UIToolkit
+✅ Wiring up ObservableScriptableObject to SO's to UI binding scripts if I'd rather do the code for data-binding,
+or need to prepare the raw data for presentation
+✅ Building systems using SystemBase<T>
+✅ Debugging reactive flows or editor issues
+✅ Writing and updating unit or runtime tests for systems
+
+Also make sure to stick to ReaCS guidelines and conventions, there should be no events, event bus or cross-communication between systems.
+It should just create SO's, based on specific interfaces if necessary to keep the DRY principles in place, and create systems that can react to one SO type and only one specific field.
+
+I will upload a `ReaCS.zip`, built from the ReaCS repository. Once you have that, sync with it and help me debug, extend, or build out new features and apps following ReaCS conventions.
+Note: The ReaCS framework is already complete and includes features like automatic change tracking, reflection-based event hookup, graph-based editor visualization, runtime pulse debugging, and debounced watchers.
+Ready for zip upload.
+
+</br> 
 
 ## License
 No License
