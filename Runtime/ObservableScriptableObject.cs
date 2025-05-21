@@ -16,12 +16,33 @@ namespace ReaCS.Runtime
 
         protected virtual void OnEnable()
         {
+            // Let's systems know what SOs exist, and iis aware of SOs lifecycle (used for fast cached lookups)
+            ObservableRegistry.Register(this);
+
+            // Tracks SO for per-frame update with .CheckForChanges, and manages debounce and markDirty logic
             ObservableRuntimeWatcher.Register(this);
+
+            // Cache values for registering changes in values later
             CacheInitialValues();
+
+            // Auto-wire all [Observable] fields
+            var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+            foreach (var field in fields)
+            {
+                if (!Attribute.IsDefined(field, typeof(ObservableAttribute))) continue;
+
+                var value = field.GetValue(this);
+                if (value is IInitializableObservable initObs)
+                {
+                    initObs.Init(this, field.Name);
+                }
+            }
         }
 
         protected virtual void OnDisable()
         {
+            ObservableRegistry.Unregister(this);
             ObservableRuntimeWatcher.Unregister(this);
         }
 

@@ -4,12 +4,18 @@ using UnityEngine;
 
 namespace ReaCS.Runtime
 {
+    public interface IInitializableObservable
+    {
+        void Init(ObservableScriptableObject owner, string fieldName);
+    }
+
     [Serializable]
-    public class Observable<T>
+    public class Observable<T> : IInitializableObservable
     {
         [SerializeField] private T value;
         [NonSerialized] private ObservableScriptableObject owner;
         [NonSerialized] private string fieldName;
+
 
         public event Action<T> OnChanged;
 
@@ -31,6 +37,11 @@ namespace ReaCS.Runtime
                     this.value = value;
                     OnChanged?.Invoke(value);
                     owner?.MarkDirty();
+
+#if UNITY_EDITOR
+                    // Invoke field changed for Editor Graph View Live Debugging
+                    ObservableEditorBridge.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
+#endif
                 }
             }
         }

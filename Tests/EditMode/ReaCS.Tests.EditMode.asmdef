@@ -1,14 +1,17 @@
 {
-    "name": "ReaCS.Tests.Runtime",
+    "name": "ReaCS.Tests.EditMode",
     "rootNamespace": "",
     "references": [
+        "ReaCS.Runtime",
+        "ReaCS.Runtime.Internal",
+        "ReaCS.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner",
-        "ReaCS.Tests.Shared",
-        "ReaCS.Runtime",
-        "ReaCS.Runtime.Internal"
+        "ReaCS.Tests.Shared"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

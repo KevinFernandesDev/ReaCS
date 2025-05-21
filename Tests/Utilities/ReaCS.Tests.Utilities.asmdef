@@ -1,13 +1,11 @@
 {
-    "name": "ReaCS.Editor",
-    "rootNamespace": "ReaCS.Editor",
+    "name": "ReaCS.Tests.Utilities",
+    "rootNamespace": "",
     "references": [
-        "ReaCS.Runtime",
-        "ReaCS.Runtime.Internal"
+        "GUID:b3f1d54100f34c049a2c7427d7162c85",
+        "GUID:c8ebb207595019443ae986c4d393faa7"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

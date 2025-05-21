@@ -1,4 +1,16 @@
 {
-	"name": "ReaCS.Runtime",
-	"rootNamespace": "ReaCS"
+    "name": "ReaCS.Runtime",
+    "rootNamespace": "ReaCS",
+    "references": [
+        "GUID:c8ebb207595019443ae986c4d393faa7"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
