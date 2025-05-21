@@ -106,14 +106,19 @@ It's made for decoupled data flow, automatic change tracking, and UI/editor bind
 
 Please help me (or my team) with:
 
-✅ Designing a new app or feature using the ReaCS architecture
-✅ Creating and wiring up ObservableScriptableObject models
-✅ Wiring up ObservableScriptableObject with the latest drag-&-drop data-binding feature of UIToolkit
-✅ Wiring up ObservableScriptableObject to SO's to UI binding scripts if I'd rather do the code for data-binding,
-or need to prepare the raw data for presentation
-✅ Building systems using SystemBase<T>
-✅ Debugging reactive flows or editor issues
-✅ Writing and updating unit or runtime tests for systems
+✅ Designing a new app or feature using the ReaCS architecture</br>
+
+✅ Creating and wiring up ObservableScriptableObject models</br>
+
+✅ Wiring up ObservableScriptableObject with the latest drag-&-drop data-binding feature of UIToolkit</br>
+
+✅ Wiring up ObservableScriptableObject to UI binding scripts if I'd rather do the code for data-binding, or need to "prepare" the data for presentation (adding a prefix to a string for presentation without modifying the underlying raw data for example)</br>
+
+✅ Building systems using SystemBase<T></br>
+
+✅ Debugging reactive flows or editor issues</br>
+
+✅ Writing and updating unit or runtime tests for systems</br>
 
 Also make sure to stick to ReaCS guidelines and conventions, there should be no events, event bus or cross-communication between systems.
 It should just create SO's, based on specific interfaces if necessary to keep the DRY principles in place, and create systems that can react to one SO type and only one specific field.
