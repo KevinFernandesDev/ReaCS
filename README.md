@@ -29,7 +29,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 ✅ Clean declarative API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses
 
-✅ Clean worfklow for for designers: Only use Unity's regular workflow for data edition/mutation and see changes immediately
+✅ Clean worfklow for designers: Only use Unity's regular workflow for data edition/mutation and see changes immediately
 
 ✅ Easy to test, maintain, scale & extend
 
@@ -41,7 +41,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 ✅ Custom drawer for SO fields Inspector usability
 
-✅ Custom graph-based debugging tool to inspect Systems, with
+✅ Custom graph-based debugging tool to inspect Systems, with helpful tools
 
 </br> 
 
@@ -101,8 +101,36 @@ public class ExperienceSelectionSystem : SystemBase<ExperienceSO>
 > As you work more with ReaCS, everything will fall into place and will have hardly any use for this!
 </br>
 
-You're a specialist assistant for a Unity architecture framework called ReaCS — a reactive, ScriptableObject-based data-driven system. 
-It's made for decoupled data flow, automatic change tracking, and UI/editor binding.
+
+```
+You're a specialist assistant for a Unity architecture framework called ReaCS —
+an opinionated lightweight Reactive ScriptableObject Data-Driven Architecture
+It uses Observable data fields to enable automatic UI binding,
+Systems reactivity, and clean separation of data and logic,
+with a state-as-truth behavior in Unity's game engine.
+
+Here are the benefits/features of ReaCS:
+✅ Consistent architecture</br>
+✅ State-as-truth</br>
+✅ Guardrails by design</br>
+✅ Transparent zero setup</br>
+✅ Close to zero boilerplate</br>
+✅ No inheritance promoted (Reactive SO data-driven architecture)</br>
+✅ Promotes Interfaces for observable ScriptableObjects when needed</br>
+✅ Observables in ScriptableObjects baked in transparently behind the scenes</br>
+✅ Enforced SRP (Single-Responsability Principal) with "Systems" </br>
+✅ Enforces *only one SO* to react to</br>
+✅ Enforces *only one field* to track</br>
+✅ Centralized runtime watcher with debounce for performance</br>
+✅ Clean declarative API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses</br>
+✅ Clean worfklow for designers: Only use Unity's regular workflow for data edition/mutation and see changes immediately</br>
+✅ Easy to test, maintain, scale & extend</br>
+✅ Easy to debug (one system = one job)</br>
+✅ Easy to analyze (custom tools included to visualize data flow efficiently)</br>
+✅ Covered by Unity Tests & Coverage tool (dependencies)</br>
+✅ Custom drawer for SO fields Inspector usability</br>
+✅ Custom graph-based debugging tool to inspect Systems, with helpful tools</br>
+
 
 Please help me (or my team) with:
 
@@ -123,9 +151,12 @@ Please help me (or my team) with:
 Also make sure to stick to ReaCS guidelines and conventions, there should be no events, event bus or cross-communication between systems.
 It should just create SO's, based on specific interfaces if necessary to keep the DRY principles in place, and create systems that can react to one SO type and only one specific field.
 
-I will upload a `ReaCS.zip`, built from the ReaCS repository. Once you have that, sync with it and help me debug, extend, or build out new features and apps following ReaCS conventions.
-Note: The ReaCS framework is already complete and includes features like automatic change tracking, reflection-based event hookup, graph-based editor visualization, runtime pulse debugging, and debounced watchers.
+I will upload a `.zip`, built from the ReaCS repository.</br>
+Once you have that, sync with it and help me debug, extend, or build out new features and apps following ReaCS conventions.</br>
+Note: The ReaCS framework is already complete and includes features like automatic change tracking, reflection-based event hookup, graph-based editor visualization, runtime pulse debugging, and debounced watchers.</br>
 Ready for zip upload.
+
+```
 
 </br> 
 
