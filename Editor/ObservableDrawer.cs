@@ -1,14 +1,14 @@
-#if UNITY_EDITOR
+﻿#if UNITY_EDITOR
 using ReaCS.Runtime;
 using UnityEditor;
 using UnityEngine;
 
 namespace ReaCS.Editor
 {
-    [CustomPropertyDrawer(typeof(Observable<>))]
+    //[CustomPropertyDrawer(typeof(Observable<>))]
     public class ObservableDrawer : PropertyDrawer
     {
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+        /*public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             var valueProp = property.FindPropertyRelative("value");
             if (valueProp == null)
@@ -24,7 +24,7 @@ namespace ReaCS.Editor
         {
             var valueProp = property.FindPropertyRelative("value");
             return EditorGUI.GetPropertyHeight(valueProp, label, true);
-        }
+        }*/
     }
 #endif
 }

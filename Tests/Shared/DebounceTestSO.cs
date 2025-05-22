@@ -31,7 +31,7 @@ namespace ReaCS.Tests.Shared
         public void TriggerChange(int newValue)
         {
             number.Value = newValue;
-            MarkDirty();
+            MarkDirty(number.ToString());
         }
 
         // Optional method for debugging test flow

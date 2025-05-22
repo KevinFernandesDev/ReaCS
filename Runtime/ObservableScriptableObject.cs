@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
+using System.IO;
+using ReaCS.Shared;
 
 namespace ReaCS.Runtime
 {
@@ -13,24 +15,20 @@ namespace ReaCS.Runtime
         private Dictionary<string, object> _cachedValues;
         private List<FieldInfo> _observedFields;
         private bool _isDirty = false;
+        private string lastChangedField;
 
         protected virtual void OnEnable()
         {
-            // Let's systems know what SOs exist, and iis aware of SOs lifecycle (used for fast cached lookups)
             ObservableRegistry.Register(this);
-
-            // Tracks SO for per-frame update with .CheckForChanges, and manages debounce and markDirty logic
             ObservableRuntimeWatcher.Register(this);
 
-            // Cache values for registering changes in values later
             CacheInitialValues();
 
-            // Auto-wire all [Observable] fields
             var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
             foreach (var field in fields)
             {
-                if (!Attribute.IsDefined(field, typeof(ObservableAttribute))) continue;
+                if (!Attribute.IsDefined(field, typeof(ObservableAttribute)) &&
+                    !Attribute.IsDefined(field, typeof(ObservableSavedAttribute))) continue;
 
                 var value = field.GetValue(this);
                 if (value is IInitializableObservable initObs)
@@ -38,12 +36,20 @@ namespace ReaCS.Runtime
                     initObs.Init(this, field.Name);
                 }
             }
+
+#if !UNITY_EDITOR
+            LoadStateFromJson();
+#endif
         }
 
         protected virtual void OnDisable()
         {
             ObservableRegistry.Unregister(this);
             ObservableRuntimeWatcher.Unregister(this);
+
+#if !UNITY_EDITOR
+            SaveStateToJson();
+#endif
         }
 
 #if UNITY_EDITOR
@@ -60,7 +66,8 @@ namespace ReaCS.Runtime
 
             foreach (var field in GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
             {
-                if (Attribute.IsDefined(field, typeof(ObservableAttribute)))
+                if (Attribute.IsDefined(field, typeof(ObservableAttribute)) ||
+                    Attribute.IsDefined(field, typeof(ObservableSavedAttribute)))
                 {
                     var fieldValue = field.GetValue(this);
 
@@ -78,20 +85,24 @@ namespace ReaCS.Runtime
                 }
             }
 
-            // Delay caching until all fields are fully set up
             foreach (var field in _observedFields)
             {
                 var observable = field.GetValue(this);
                 var valueProp = field.FieldType.GetProperty("Value");
                 var value = valueProp?.GetValue(observable);
                 _cachedValues[field.Name] = value;
-
             }
         }
 
-
         internal void CheckForChanges()
         {
+
+            if (_observedFields == null || _cachedValues == null)
+            {
+                ReaCSDebug.LogWarning($"[ReaCS] Skipping CheckForChanges on {name} — not fully initialized.");
+                return;
+            }
+
             ReaCSDebug.Log($"[{name}] CheckForChanges called (isDirty = {_isDirty})");
 
             if (!_isDirty)
@@ -102,6 +113,8 @@ namespace ReaCS.Runtime
 
             foreach (var field in _observedFields)
             {
+                if (field.Name != lastChangedField) continue;
+
                 var observable = field.GetValue(this);
                 var valueProp = field.FieldType.GetProperty("Value");
                 var newValue = valueProp?.GetValue(observable);
@@ -118,6 +131,7 @@ namespace ReaCS.Runtime
                 if (!_cachedValues.TryGetValue(field.Name, out var cachedValue) || !Equals(cachedValue, newValue))
                 {
                     ReaCSDebug.Log($"[{name}] Field changed: {field.Name}");
+                    ReaCSDebug.Log($"[{name}] Checking field {field.Name}: cached={cachedValue}, current={newValue}");
 
                     _cachedValues[field.Name] = newValue;
                     OnChanged?.Invoke(this, field.Name);
@@ -127,15 +141,86 @@ namespace ReaCS.Runtime
 
             _isDirty = false;
         }
-
-
-        public void MarkDirty()
+        public void MarkDirty(string fieldName)
         {
-            ReaCSDebug.Log($"[{name}] Marked dirty.");
-
+            lastChangedField = fieldName;
             _isDirty = true;
+            CheckForChanges();
+        }
 
-            ReaCSDebug.Log($"[{name}] Marked dirty (isDirty now = {_isDirty})");
+        private string GetSavePath()
+        {
+#if UNITY_EDITOR
+            return Path.Combine("Temp", name + "_snapshot.json");
+#else
+            return Path.Combine(Application.persistentDataPath, name + "_state.json");
+#endif
+        }
+
+        public void SaveStateToJson()
+        {
+            var json = JsonUtility.ToJson(this);
+            File.WriteAllText(GetSavePath(), json);
+        }
+
+        /// <summary>
+        /// Loads values for Observable fields from a saved JSON snapshot.
+        /// 
+        /// In runtime builds:
+        ///     - Fields marked ShouldPersist = true will be loaded from disk.
+        ///     - Fields with ShouldPersist = false will retain their inspector values.
+        ///
+        /// In the Unity Editor:
+        ///     - Fields marked ShouldPersist = true will keep their inspector values (Serialized fields just work).
+        ///     - Fields with ShouldPersist = false will be overwritten by the saved runtime values (preview mode).
+        /// </summary>
+        public void LoadStateFromJson()
+        {
+            string path = GetSavePath();
+            if (!File.Exists(path)) return;
+
+            var json = File.ReadAllText(path);
+            var clone = CreateInstance(GetType()) as ObservableScriptableObject;
+            JsonUtility.FromJsonOverwrite(json, clone);
+
+            foreach (var field in _observedFields)
+            {
+                var targetObs = field.GetValue(this);
+                var sourceObs = field.GetValue(clone);
+
+                if (targetObs == null || sourceObs == null)
+                    continue;
+
+                var shouldPersistField = field.FieldType.GetField("ShouldPersist", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                var valueProp = field.FieldType.GetProperty("Value");
+
+                if (shouldPersistField == null || valueProp == null)
+                    continue;
+
+                bool shouldPersist = (bool)(shouldPersistField.GetValue(targetObs) ?? false);
+
+#if UNITY_EDITOR
+                // In Editor: skip loading if marked to persist inspector value
+                if (shouldPersist)
+                    continue;
+#else
+        // At runtime: skip loading if NOT marked to persist
+        if (!shouldPersist)
+            continue;
+#endif
+
+                var value = valueProp.GetValue(sourceObs);
+                valueProp.SetValue(targetObs, value);
+            }
+
+            ObservableRuntimeWatcher.Unregister(clone);
+            ObservableRegistry.Unregister(clone);
+
+#if UNITY_EDITOR
+            DestroyImmediate(clone);
+#else
+    Destroy(clone);
+#endif
         }
     }
 }

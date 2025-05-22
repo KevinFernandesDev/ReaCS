@@ -1,16 +1,12 @@
 using UnityEngine;
+using ReaCS.Shared;
 
 namespace ReaCS.Runtime.Internal
 {
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public static class ReaCSDebug
     {
-#if UNITY_EDITOR
-        public static bool EnableLogs =>
-            UnityEditor.EditorPrefs.GetBool("ReaCS_DebugLogs", false);
-#else
-        public static bool EnableLogs => false;
-#endif
+        public static bool EnableLogs => ReaCSSettings.ReaCSLogs;
 
         public static void Log(string message)
         {

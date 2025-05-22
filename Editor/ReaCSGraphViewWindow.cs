@@ -1,14 +1,14 @@
 using UnityEngine;
-using UnityEditor;
 using UnityEngine.UIElements;
-using UnityEditor.Experimental.GraphView;
+using UnityEngine.UIElements.Experimental;
+using UnityEditor;
 using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Reflection;
 using ReaCS.Runtime;
 using ReaCS.Runtime.Internal;
-using UnityEngine.UIElements.Experimental;
+using ReaCS.Shared;
 
 namespace ReaCS.Editor
 {
@@ -29,6 +29,7 @@ namespace ReaCS.Editor
 
         public void OnEnable()
         {
+            ReaCSSettings.EnableVisualGraphEditModeReactions = true;
             ObservableEditorBridge.OnEditorFieldChanged += MarkFieldChangedFromRuntime;
             Selection.selectionChanged += OnSelectionChanged;
             rootVisualElement.Clear();
@@ -183,7 +184,9 @@ namespace ReaCS.Editor
             var visibleNodes = new HashSet<string> { so.name };
 
             var fields = so.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(f => Attribute.IsDefined(f, typeof(ObservableAttribute)));
+                .Where(f =>
+                    Attribute.IsDefined(f, typeof(ObservableAttribute)) ||
+                    Attribute.IsDefined(f, typeof(ObservableSavedAttribute)));
 
             foreach (var field in fields)
             {
@@ -225,6 +228,7 @@ namespace ReaCS.Editor
         {
             Selection.selectionChanged -= OnSelectionChanged;
             rootVisualElement.Clear();
+            ReaCSSettings.EnableVisualGraphEditModeReactions = false;
         }
     }
 }

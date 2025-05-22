@@ -25,7 +25,7 @@ ReaCS is an opinionated lightweight <b><i>Reactive ScriptableObject Data-Driven 
 
 ✅ Enforces *only one field* to track
 
-✅ Centralized runtime watcher with debounce for performance
+✅ Centralized runtime watcher with debounce for performance (useful for UIControls like sliders so that super fast changes are not systematically triggered immediately)
 
 ✅ Clean declarative API for devs: no subscriptions, no events, cross-monobehavior referencing or data/method accesses
 

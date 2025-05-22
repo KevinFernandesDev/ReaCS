@@ -137,27 +137,37 @@ namespace ReaCS.Editor
 
         public void MarkChanged(string fieldId)
         {
-            Debug.Log($"[GraphView] MarkChanged called for {fieldId}");
+            ReaCSDebug.Log($"[GraphView] MarkChanged called for {fieldId}");
 
-            if (!nodeMap.TryGetValue(fieldId, out var fieldNode)) return;
-
-            changedTimestamps[fieldId] = (float)EditorApplication.timeSinceStartup;
+            if (nodeMap.TryGetValue(fieldId, out var fieldNode))
+            {
+                changedTimestamps[fieldId] = (float)EditorApplication.timeSinceStartup;
+            }
 
             schedule.Execute(UpdatePulse).Every(16);
             UpdatePulse();
 
             foreach (var edge in allFlowingEdges)
             {
-                if (edge.output?.node == fieldNode || edge.input?.node == fieldNode)
-                {
-                    Debug.Log($"[GraphView] Edge added to pulse: {edge.output.node.title} ➜ {edge.input.node.title}");
-                    activePulseEdges[edge] = EditorApplication.timeSinceStartup;
+                if (!nodeToId.TryGetValue(edge.output?.node, out var outputId)) continue;
+                if (!nodeToId.TryGetValue(edge.input?.node, out var inputId)) continue;
 
-                    if (edge.input?.node?.title != null)
-                        changedTimestamps[edge.input.node.title] = (float)EditorApplication.timeSinceStartup;
+                // ✅ Pulse edges coming *from* the changed field
+                if (outputId == fieldId)
+                {
+                    activePulseEdges[edge] = EditorApplication.timeSinceStartup;
+                    changedTimestamps[inputId] = (float)EditorApplication.timeSinceStartup;
+                }
+
+                // ✅ Pulse edges going *to* the changed field (e.g. SO ➝ field)
+                if (inputId == fieldId)
+                {
+                    activePulseEdges[edge] = EditorApplication.timeSinceStartup;
+                    changedTimestamps[outputId] = (float)EditorApplication.timeSinceStartup;
                 }
             }
         }
+
 
         private void UpdatePulse()
         {
@@ -356,7 +366,9 @@ namespace ReaCS.Editor
 
                 var fields = so.GetType()
                     .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    .Where(f => Attribute.IsDefined(f, typeof(ObservableAttribute)));
+                    .Where(f =>
+                        Attribute.IsDefined(f, typeof(ObservableAttribute)) ||
+                        Attribute.IsDefined(f, typeof(ObservableSavedAttribute)));
 
                 int fieldIndex = 0;
                 foreach (var field in fields)
@@ -366,7 +378,10 @@ namespace ReaCS.Editor
                     if (filter != null && !filter.Contains(fieldId)) continue;
 
                     float fieldY = y + fieldIndex * verticalSpacing;
+                                        
+
                     var fieldNode = CreateNode($"🔸 {fieldName}", NodeType.Field, new Vector2(xField, fieldY), $"{so.name}.{fieldName}");
+                                        
                     nodeMap[fieldId] = fieldNode;
                     AddElement(fieldNode);
                     fieldToSO[fieldId] = soId;
@@ -379,17 +394,33 @@ namespace ReaCS.Editor
                     });
 
                     int systemIndex = 0;
+                    ReaCSDebug.Log($"[ReaCS] Found {allSystemTypes.Count} system types.");
                     foreach (var sysType in allSystemTypes)
                     {
+                        ReaCSDebug.Log($"[ReaCS] System: {sysType.FullName}");
                         var attrs = sysType.GetCustomAttributes(typeof(ReactToAttribute), true);
                         foreach (var attr in attrs.Cast<ReactToAttribute>())
                         {
-                            if (attr.FieldName != fieldName) continue;
+                            ReaCSDebug.Log($" └ Reacts to: {attr.FieldName}");
+                            if (attr.FieldName != fieldName)
+                            {
+                                ReaCSDebug.Log($"   ❌ Skipped (doesn't match field: {fieldName})");
+                                continue;
+                            }
+
                             var baseType = sysType.BaseType;
                             if (baseType is { IsGenericType: true })
                             {
                                 var soType = baseType.GetGenericArguments()[0];
-                                if (!soType.IsAssignableFrom(so.GetType())) continue;
+                                ReaCSDebug.Log($"   ➤ Checks if {soType.Name} is assignable from {so.GetType().Name}");
+
+                                if (!soType.IsAssignableFrom(so.GetType()))
+                                {
+                                    ReaCSDebug.Log($"   ❌ Skipped (type mismatch)");
+                                    continue;
+                                }
+
+                                ReaCSDebug.Log($"   ✅ Matched — will create system node!");
 
                                 string sysId = sysType.Name;
                                 if (filter != null && !filter.Contains(sysId)) continue;
@@ -412,7 +443,8 @@ namespace ReaCS.Editor
 
                         foreach (var otherField in so.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
                         {
-                            if (!Attribute.IsDefined(otherField, typeof(ObservableAttribute))) continue;
+                            if (!Attribute.IsDefined(otherField, typeof(ObservableAttribute)) &&
+                                !Attribute.IsDefined(otherField, typeof(ObservableSavedAttribute))) continue;
 
                             string targetFieldId = $"{so.name}.{otherField.Name}";
                             if (targetFieldId == sourceFieldId) continue;
@@ -431,14 +463,14 @@ namespace ReaCS.Editor
                 }
 
                 // Final Y adjustment per SO
-                y += Math.Max(fields.Count(), 1) * verticalSpacing;                
+                y += Math.Max(fields.Count(), 1) * verticalSpacing;
             }
             UpdateFieldLabels();
         }
 
         private Node CreateNode(string title, NodeType type, Vector2 position, string nodeId)
         {
-            var node = new Node { title = title };
+            var node = new Node();
 
             var input = Port.Create<Edge>(Orientation.Horizontal, Direction.Input, Port.Capacity.Multi, typeof(float));
             input.portName = "In";
@@ -449,44 +481,20 @@ namespace ReaCS.Editor
             node.outputContainer.Add(output);
 
             node.userData = type;
-            switch (type)
+
+            // Default title, may override for fields
+            string displayTitle = title;
+
+            if (type == NodeType.SO)
             {
-                case NodeType.SO: node.style.backgroundColor = Color.teal; break;
-                case NodeType.System: node.style.backgroundColor = new Color(0.42f, 0.35f, 0.80f); break;
-                case NodeType.Field: node.style.backgroundColor = Color.clear; break;
+                node.style.backgroundColor = Color.teal;
             }
-
-            if (type == NodeType.Field)
+            else if (type == NodeType.System)
             {
-                // Create a vertical stack container
-                var fieldInfoContainer = new VisualElement();
-                fieldInfoContainer.style.flexDirection = FlexDirection.Column;
-                fieldInfoContainer.style.marginTop = 4;
-                fieldInfoContainer.style.marginBottom = 4;
-                fieldInfoContainer.style.paddingLeft = 6;
-                fieldInfoContainer.style.paddingRight = 6;
-
-                // Value box (icon + label, reused from before)
-                var valueRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
-
-                var icon = new Label(""); // ✅ / ❌ / ⚠️
-                icon.style.marginRight = 4;
-                icon.style.fontSize = 14;
-
-                var valueLabel = new Label("null");
-                valueLabel.style.fontSize = 12;
-                valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
-
-                valueRow.Add(icon);
-                valueRow.Add(valueLabel);
-
-                // Type info row
-                var typeRow = new Label();
-                typeRow.style.fontSize = 9;
-                typeRow.style.color = Color.gray;
-                typeRow.style.marginTop = 2;
-
-                // Fill in type info
+                node.style.backgroundColor = new Color(0.42f, 0.35f, 0.80f);
+            }
+            else if (type == NodeType.Field)
+            {
                 var split = nodeId.Split('.');
                 if (split.Length == 2)
                 {
@@ -501,20 +509,82 @@ namespace ReaCS.Editor
                         var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
                         if (field != null)
                         {
-                            string declaring = so.GetType().Name;
+                            var observable = field.GetValue(so);
+                            if (observable != null)
+                            {
+                                var persistFlag = field.FieldType.GetField("ShouldPersist", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+                                if (persistFlag != null && persistFlag.FieldType == typeof(bool))
+                                {
+                                    bool shouldPersist = (bool)persistFlag.GetValue(observable);
+                                    displayTitle = (shouldPersist ? "🔒" : "🔁") + $" {fieldName}";
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            node.title = displayTitle;
+
+            if (type == NodeType.Field)
+            {
+                var fieldInfoContainer = new VisualElement
+                {
+                    style = {
+                flexDirection = FlexDirection.Column,
+                marginTop = 4,
+                marginBottom = 4,
+                paddingLeft = 6,
+                paddingRight = 6
+            }
+                };
+
+                var valueRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
+
+                var icon = new Label(""); // ✅ / ❌ / ⚠️
+                icon.style.marginRight = 4;
+                icon.style.fontSize = 14;
+
+                var valueLabel = new Label("null");
+                valueLabel.style.fontSize = 12;
+                valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+                valueRow.Add(icon);
+                valueRow.Add(valueLabel);
+
+                var typeRow = new Label
+                {
+                    style = {
+                fontSize = 9,
+                color = Color.gray,
+                marginTop = 2
+            }
+                };
+
+                var split = nodeId.Split('.');
+                if (split.Length == 2)
+                {
+                    string soName = split[0];
+                    string fieldName = split[1];
+
+                    var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                        .FirstOrDefault(s => s.name == soName);
+
+                    if (so != null)
+                    {
+                        var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        if (field != null)
+                        {
                             string fType = field.FieldType.IsGenericType
                                 ? $"Observable<{field.FieldType.GetGenericArguments()[0].Name}>"
                                 : field.FieldType.Name;
 
-                            // Swap if we want the declaring type
-                            //typeRow.text = $"[{declaring}]\n[{fType}]";
                             typeRow.text = $"[{fType}]";
-
                         }
                     }
                 }
 
-                // Add to layout
                 fieldInfoContainer.Add(typeRow);
                 fieldInfoContainer.Add(CreateDottedDivider());
                 fieldInfoContainer.Add(valueRow);
@@ -522,11 +592,9 @@ namespace ReaCS.Editor
                 node.extensionContainer.Add(fieldInfoContainer);
                 node.RefreshExpandedState();
 
-                // Cache references
                 fieldValueLabels[nodeId] = valueLabel;
                 fieldValueIcons[nodeId] = icon;
                 fieldValueContainers[nodeId] = valueRow;
-
             }
 
             node.capabilities |= Capabilities.Movable | Capabilities.Selectable;
@@ -536,11 +604,11 @@ namespace ReaCS.Editor
             node.RefreshPorts();
             node.SetPosition(new Rect(position, defaultNodeSize));
 
-            // Register ID mapping
             nodeToId[node] = nodeId;
 
             return node;
         }
+
 
         private void UpdateFieldLabels()
         {

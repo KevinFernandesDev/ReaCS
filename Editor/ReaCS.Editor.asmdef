@@ -3,7 +3,8 @@
     "rootNamespace": "ReaCS.Editor",
     "references": [
         "ReaCS.Runtime",
-        "ReaCS.Runtime.Internal"
+        "ReaCS.Runtime.Internal",
+        "ReaCS.Shared"
     ],
     "includePlatforms": [
         "Editor"

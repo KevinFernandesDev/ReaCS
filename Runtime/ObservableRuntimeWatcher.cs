@@ -1,4 +1,4 @@
-using ReaCS.Runtime.Internal;
+﻿using ReaCS.Runtime.Internal;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -48,7 +48,7 @@ namespace ReaCS.Runtime
             {
                 ReaCSDebug.Log($"[Watcher] Checking SO: {obj.name}");
 
-                if (_debouncedSet.Contains(obj)) continue;
+                //if (_debouncedSet.Contains(obj)) continue;
                 obj.CheckForChanges();
             }
         }

@@ -7,11 +7,7 @@ namespace ReaCS.Runtime
     {
         private static readonly Dictionary<Type, List<ObservableScriptableObject>> _instances = new();
         public static event Action<ObservableScriptableObject> OnRegistered;
-        public static event Action<ObservableScriptableObject> OnUnregistered;
-
-        
-
-        
+        public static event Action<ObservableScriptableObject> OnUnregistered;           
 
         public static void Register(ObservableScriptableObject so)
         {

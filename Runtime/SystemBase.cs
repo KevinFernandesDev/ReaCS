@@ -1,5 +1,5 @@
 using ReaCS.Runtime.Internal;
-using System.Collections;
+using ReaCS.Shared;
 using System.Reflection;
 using UnityEngine;
 
@@ -9,65 +9,102 @@ namespace ReaCS.Runtime
         where TSO : ObservableScriptableObject
     {
         private string _observedField;
+        private bool _subscribed = false;
 
         protected virtual void OnEnable()
         {
-            StartCoroutine(DeferredSubscribe());
-        }
-
-        private IEnumerator DeferredSubscribe()
-        {
-            yield return new WaitForEndOfFrame(); // Wait for all SOs to register
-
+            ReaCSDebug.Log($"[ReaCS] Enabling {GetType().Name}...");
+#if UNITY_EDITOR
+            if (!Application.isPlaying && !ReaCSSettings.EnableVisualGraphEditModeReactions)
+            {
+                ReaCSDebug.Log($"[ReaCS] Skipping {GetType().Name} — not in playmode and visual graph reactions disabled.");
+                return;
+            }
+#endif
             _observedField = ResolveObservedField();
 
             if (string.IsNullOrEmpty(_observedField))
             {
-                Debug.LogWarning($"[ReaCS] {GetType().Name} is missing a valid [ReactTo] attribute.");
-                yield break;
+                ReaCSDebug.LogWarning($"[ReaCS] {GetType().Name} is missing a valid [ReactTo] attribute.");
+                return;
             }
 
+            ObservableRegistry.OnRegistered += HandleNewSO;
+            ObservableRegistry.OnUnregistered += HandleRemovedSO;
+
+            SubscribeAll();
+        }
+
+        protected virtual void OnDisable()
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying && !ReaCSSettings.EnableVisualGraphEditModeReactions)
+            {
+                ReaCSDebug.Log($"[ReaCS] Disabling {GetType().Name} — not in playmode and visual graph reactions disabled.");
+                return;
+            }
+#endif
+            ObservableRegistry.OnRegistered -= HandleNewSO;
+            ObservableRegistry.OnUnregistered -= HandleRemovedSO;
+
+            UnsubscribeAll();
+            _subscribed = false;
+            ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from all.");
+        }
+
+        private void HandleNewSO(ObservableScriptableObject so)
+        {
+            if (so is TSO typed && IsTarget(typed))
+            {
+                typed.OnChanged -= HandleChange;
+                typed.OnChanged += HandleChange;
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} late-subscribed to {typed.name}.{_observedField}");
+            }
+        }
+
+        private void HandleRemovedSO(ObservableScriptableObject so)
+        {
+            if (so is TSO typed && IsTarget(typed))
+            {
+                typed.OnChanged -= HandleChange;
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from {typed.name}.{_observedField} (removed)");
+            }
+        }
+
+        private void SubscribeAll()
+        {
             foreach (var so in ObservableRegistry.GetAll<TSO>())
             {
                 if (IsTarget(so))
                 {
-                    so.OnChanged -= HandleChange; // Safety
+                    so.OnChanged -= HandleChange;
                     so.OnChanged += HandleChange;
+                    ReaCSDebug.Log($"[ReaCS] {GetType().Name} subscribed to {so.name}.{_observedField}");
                 }
             }
+
+            _subscribed = true;
         }
 
-
-        protected virtual void OnDisable()
+        private void UnsubscribeAll()
         {
-            if (string.IsNullOrEmpty(_observedField)) return;
-
             foreach (var so in ObservableRegistry.GetAll<TSO>())
             {
                 if (IsTarget(so))
+                {
                     so.OnChanged -= HandleChange;
+                    ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from {so.name}.{_observedField}");
+                }
             }
-        }
-
-        private void TrySubscribe(ObservableScriptableObject obj)
-        {
-            if (obj is TSO so && IsTarget(so))
-            {
-                so.OnChanged -= HandleChange; // prevent double sub
-                so.OnChanged += HandleChange;
-            }
-        }
-
-        private void TryUnsubscribe(ObservableScriptableObject obj)
-        {
-            if (obj is TSO so && IsTarget(so))
-                so.OnChanged -= HandleChange;
         }
 
         private void HandleChange(ObservableScriptableObject so, string fieldName)
         {
             if (fieldName == _observedField)
+            {
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
                 OnFieldChanged((TSO)so);
+            }
         }
 
         protected abstract void OnFieldChanged(TSO changedSO);

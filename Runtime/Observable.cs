@@ -12,6 +12,8 @@ namespace ReaCS.Runtime
     [Serializable]
     public class Observable<T> : IInitializableObservable
     {
+        [SerializeField] public bool ShouldPersist = false;
+
         [SerializeField] private T value;
         [NonSerialized] private ObservableScriptableObject owner;
         [NonSerialized] private string fieldName;
@@ -30,13 +32,15 @@ namespace ReaCS.Runtime
             get => value;
             set
             {
+                ReaCSDebug.Log($"[Observable] Attempting to set {fieldName} to {value} (was {this.value})");
+
                 if (!Equals(this.value, value))
                 {
                     ReaCSDebug.Log($"[Observable] Value changed from {this.value} to {value}");
 
                     this.value = value;
                     OnChanged?.Invoke(value);
-                    owner?.MarkDirty();
+                    owner?.MarkDirty(fieldName);
 
 #if UNITY_EDITOR
                     // Invoke field changed for Editor Graph View Live Debugging
