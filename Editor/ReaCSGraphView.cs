@@ -29,6 +29,8 @@ namespace ReaCS.Editor
         private Dictionary<string, VisualElement> fieldValueContainers = new();
         private Dictionary<Node, string> nodeToId = new();
         private Dictionary<string, List<string>> fieldToFieldGraph = new();
+        private readonly Dictionary<Node, Color> originalNodeColors = new();
+
         private string currentFilter = "";
 
         public ReaCSGraphView()
@@ -83,6 +85,24 @@ namespace ReaCS.Editor
             helpLabel.style.marginBottom = 4;
 
             Add(helpLabel);
+
+            // === Shortcut Help Banner ===
+            var editorSystemWarningLabel = new Label("When in EditMode 'Systems' won't react but you can still see every 'System' in the project reacting to an 'Observable' field that changed for debug purposes.\n" +
+                "When in PlayMode only the 'Systems' present in the current opened seens will be visible and they will react normally to an 'Observable' changing.")
+            {
+                style = {
+                    fontSize = 10,
+                    unityFontStyleAndWeight = FontStyle.Italic,
+                    color = new Color(1f, 1f, 1f, 0.5f),
+                    position = Position.Relative
+                }
+            };
+            editorSystemWarningLabel.style.unityTextAlign = TextAnchor.UpperCenter;
+            editorSystemWarningLabel.style.alignSelf = Align.Center;
+            editorSystemWarningLabel.style.marginTop = 8;
+            editorSystemWarningLabel.style.marginBottom = 4;
+
+            Add(editorSystemWarningLabel);
         }
 
         public void Filter(string filter)
@@ -201,79 +221,25 @@ namespace ReaCS.Editor
                 {
                     if (elapsed > 4f)
                     {
-                        node.style.backgroundColor = Color.clear;
+                        if (originalNodeColors.TryGetValue(node, out var baseColor))
+                            SetNodeColor(node, baseColor);
+                        else
+                            SetNodeColor(node, Color.clear);
                         changedTimestamps.Remove(id);
                     }
                     else
                     {
                         float pulse = Mathf.Abs(Mathf.Sin(elapsed * 5f));
-                        node.style.backgroundColor = Color.Lerp(Color.yellow, Color.red, pulse);
+                        SetNodeColor(node, Color.Lerp(Color.yellow, Color.red, pulse));
                     }
                 }
             }
-            /*
-            foreach (var kvp in fieldValueLabels)
-            {
-                string fieldId = kvp.Key;
-                Label label = kvp.Value;
-
-                var split = fieldId.Split('.');
-                if (split.Length != 2) continue;
-
-                string soName = split[0];
-                string fieldName = split[1];
-
-                var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                    .FirstOrDefault(s => s.name == soName);
-                if (so == null) continue;
-
-                var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                if (field == null) continue;
-
-                var observable = field.GetValue(so);
-                if (observable == null) continue;
-
-                var valueProp = observable.GetType().GetProperty("Value");
-                if (valueProp == null) continue;
-
-                var value = valueProp.GetValue(observable);
-                var valueStr = value?.ToString() ?? "null";
-
-                // Update text only if changed
-                if (!lastFieldValues.TryGetValue(fieldId, out var oldValue) || !Equals(oldValue, value))
-                {
-                    label.text = valueStr;
-                    lastFieldValues[fieldId] = value;
-                }
-
-                // Emoji logic
-                if (fieldValueIcons.TryGetValue(fieldId, out var iconElem))
-                {
-                    if (value == null)
-                    {
-                        iconElem.visible = true;
-                        (iconElem as Label).text = "⚠️";
-                        iconElem.tooltip = "Value is null";
-                    }
-                    else if (value is bool b)
-                    {
-                        iconElem.visible = true;
-                        (iconElem as Label).text = b ? "✅" : "❌";
-                        iconElem.tooltip = b ? "True" : "False";
-                    }
-                    else
-                    {
-                        iconElem.visible = false;
-                    }
-                }
-            }
-            */
             UpdateFieldLabels();
 
         }
 
         public void Populate()
-        {
+        {            
             var previousActiveEdges = new Dictionary<FlowingEdge, double>(activePulseEdges);
             var previousChanged = new Dictionary<string, float>(changedTimestamps);
 
@@ -352,7 +318,7 @@ namespace ReaCS.Editor
                 .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
                 .ToList();
 
-            float xSO = 0f, xField = 300f, xSystem = 600f;
+            float xSO = 0f, xField = 300f, xSystem = 800f;
             float y = 0f, verticalSpacing = 160f;
 
             foreach (var so in allSOs)
@@ -420,9 +386,21 @@ namespace ReaCS.Editor
                                     continue;
                                 }
 
+                                string sysId = sysType.Name;
+
+                                // ✅ Skip this system if we're in playmode and it has no live instances
+                                if (Application.isPlaying)
+                                {
+                                    var liveInstances = GameObject.FindObjectsByType(sysType, FindObjectsSortMode.InstanceID);
+                                    if (liveInstances == null || liveInstances.Length == 0)
+                                    {
+                                        ReaCSDebug.Log($"   ⏸ Skipped {sysType.Name} — not in scene (Play Mode).");
+                                        continue;
+                                    }
+                                }
+
                                 ReaCSDebug.Log($"   ✅ Matched — will create system node!");
 
-                                string sysId = sysType.Name;
                                 if (filter != null && !filter.Contains(sysId)) continue;
 
                                 if (!nodeMap.TryGetValue(sysId, out var sysNode))
@@ -468,6 +446,18 @@ namespace ReaCS.Editor
             UpdateFieldLabels();
         }
 
+        private void SetNodeColor(Node node, Color color)
+        {
+            //node.style.backgroundColor = color;
+            node.mainContainer.style.backgroundColor = color;
+            node.titleContainer.style.backgroundColor = color;
+
+            // ✅ Only store original color if it hasn't been stored yet
+            if (!originalNodeColors.ContainsKey(node))
+                originalNodeColors[node] = color;
+        }
+
+
         private Node CreateNode(string title, NodeType type, Vector2 position, string nodeId)
         {
             var node = new Node();
@@ -487,14 +477,15 @@ namespace ReaCS.Editor
 
             if (type == NodeType.SO)
             {
-                node.style.backgroundColor = Color.teal;
+                SetNodeColor(node, Color.teal);
             }
             else if (type == NodeType.System)
             {
-                node.style.backgroundColor = new Color(0.42f, 0.35f, 0.80f);
+                SetNodeColor(node, new Color(0.22f, 0.15f, 0.60f));
             }
             else if (type == NodeType.Field)
             {
+                SetNodeColor(node, new Color(0.17f, 0.17f, 0.17f));
                 var split = nodeId.Split('.');
                 if (split.Length == 2)
                 {

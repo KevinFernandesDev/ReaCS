@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace ReaCS.Runtime
 {
@@ -7,10 +8,15 @@ namespace ReaCS.Runtime
     {
         private static readonly Dictionary<Type, List<ObservableScriptableObject>> _instances = new();
         public static event Action<ObservableScriptableObject> OnRegistered;
-        public static event Action<ObservableScriptableObject> OnUnregistered;           
+        public static event Action<ObservableScriptableObject> OnUnregistered;
 
         public static void Register(ObservableScriptableObject so)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#else
+            if (!Application.isPlaying) return;
+#endif
             var type = so.GetType();
             if (!_instances.TryGetValue(type, out var list))
             {
@@ -21,17 +27,22 @@ namespace ReaCS.Runtime
             if (!list.Contains(so))
             {
                 list.Add(so);
-                OnRegistered?.Invoke(so); // 🔥 Notify
+                OnRegistered?.Invoke(so);
             }
         }
 
         public static void Unregister(ObservableScriptableObject so)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#else
+            if (!Application.isPlaying) return;
+#endif
             var type = so.GetType();
             if (_instances.TryGetValue(type, out var list))
             {
                 if (list.Remove(so))
-                    OnUnregistered?.Invoke(so); // 🔥 Notify
+                    OnUnregistered?.Invoke(so);
 
                 if (list.Count == 0)
                     _instances.Remove(type);

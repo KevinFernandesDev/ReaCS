@@ -1,4 +1,4 @@
-using ReaCS.Runtime.Internal;
+ï»¿using ReaCS.Runtime.Internal;
 using ReaCS.Shared;
 using System.Reflection;
 using UnityEngine;
@@ -11,18 +11,37 @@ namespace ReaCS.Runtime
         private string _observedField;
         private bool _subscribed = false;
 
+        // Utility: active scene check for runtime filtering
+        private bool IsInActiveScene()
+        {
+            return gameObject.scene.IsValid() && gameObject.activeInHierarchy;
+        }
+
+#if UNITY_EDITOR
         protected virtual void OnEnable()
         {
-            ReaCSDebug.Log($"[ReaCS] Enabling {GetType().Name}...");
-#if UNITY_EDITOR
-            if (!Application.isPlaying && !ReaCSSettings.EnableVisualGraphEditModeReactions)
-            {
-                ReaCSDebug.Log($"[ReaCS] Skipping {GetType().Name} — not in playmode and visual graph reactions disabled.");
-                return;
-            }
-#endif
+            if (Application.isPlaying) return; // Ignore during playmode
             _observedField = ResolveObservedField();
 
+            ObservableRegistry.OnRegistered += HandleNewSO;
+            ObservableRegistry.OnUnregistered += HandleRemovedSO;
+        }
+
+        protected virtual void OnDisable()
+        {
+            if (Application.isPlaying) return;
+            ObservableRegistry.OnRegistered -= HandleNewSO;
+            ObservableRegistry.OnUnregistered -= HandleRemovedSO;
+        }
+#endif
+
+        // Runtime init â€” Start is guaranteed to run after all OnEnables
+        protected virtual void Start()
+        {
+            if (!Application.isPlaying) return;
+            if (!IsInActiveScene()) return;
+
+            _observedField = ResolveObservedField();
             if (string.IsNullOrEmpty(_observedField))
             {
                 ReaCSDebug.LogWarning($"[ReaCS] {GetType().Name} is missing a valid [ReactTo] attribute.");
@@ -35,15 +54,10 @@ namespace ReaCS.Runtime
             SubscribeAll();
         }
 
-        protected virtual void OnDisable()
+        protected virtual void OnDestroy()
         {
-#if UNITY_EDITOR
-            if (!Application.isPlaying && !ReaCSSettings.EnableVisualGraphEditModeReactions)
-            {
-                ReaCSDebug.Log($"[ReaCS] Disabling {GetType().Name} — not in playmode and visual graph reactions disabled.");
-                return;
-            }
-#endif
+            if (!Application.isPlaying) return;
+
             ObservableRegistry.OnRegistered -= HandleNewSO;
             ObservableRegistry.OnUnregistered -= HandleRemovedSO;
 
@@ -54,6 +68,9 @@ namespace ReaCS.Runtime
 
         private void HandleNewSO(ObservableScriptableObject so)
         {
+            if (!Application.isPlaying) return;
+            if (!IsInActiveScene()) return;
+
             if (so is TSO typed && IsTarget(typed))
             {
                 typed.OnChanged -= HandleChange;
@@ -64,6 +81,9 @@ namespace ReaCS.Runtime
 
         private void HandleRemovedSO(ObservableScriptableObject so)
         {
+            if (!Application.isPlaying) return;
+            if (!IsInActiveScene()) return;
+
             if (so is TSO typed && IsTarget(typed))
             {
                 typed.OnChanged -= HandleChange;
@@ -73,6 +93,9 @@ namespace ReaCS.Runtime
 
         private void SubscribeAll()
         {
+            if (!Application.isPlaying) return;
+            if (!IsInActiveScene()) return;
+
             foreach (var so in ObservableRegistry.GetAll<TSO>())
             {
                 if (IsTarget(so))
@@ -88,6 +111,8 @@ namespace ReaCS.Runtime
 
         private void UnsubscribeAll()
         {
+            if (!Application.isPlaying) return;
+
             foreach (var so in ObservableRegistry.GetAll<TSO>())
             {
                 if (IsTarget(so))
@@ -100,6 +125,8 @@ namespace ReaCS.Runtime
 
         private void HandleChange(ObservableScriptableObject so, string fieldName)
         {
+            if (!Application.isPlaying) return;
+
             if (fieldName == _observedField)
             {
                 ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
@@ -108,7 +135,6 @@ namespace ReaCS.Runtime
         }
 
         protected abstract void OnFieldChanged(TSO changedSO);
-
         protected virtual bool IsTarget(TSO so) => true;
 
         private string ResolveObservedField()

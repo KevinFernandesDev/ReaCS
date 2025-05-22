@@ -27,7 +27,13 @@ namespace ReaCS.Editor
                 foreach (var so in allSOs)
                     so.LoadStateFromJson();
             }
+
+            if (state == PlayModeStateChange.EnteredPlayMode || state == PlayModeStateChange.EnteredEditMode)
+            {
+                ReaCSGraphViewWindowHelper.ResetOpenGraphView();
+            }
         }
     }
+
 #endif
 }

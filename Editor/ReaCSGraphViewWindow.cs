@@ -102,6 +102,12 @@ namespace ReaCS.Editor
 
             graphView.Populate();
 
+            if (Application.isPlaying)
+            {
+                // Automatically reset view when entering play mode
+                HandleReset();
+            }
+
             rootVisualElement.RegisterCallback<KeyDownEvent>(evt =>
             {
                 if (evt.keyCode == KeyCode.L)
@@ -122,7 +128,7 @@ namespace ReaCS.Editor
             graphView?.MarkChanged($"{soName}.{fieldName}");
         }
 
-        private void HandleReset()
+        public void HandleReset()
         {
             isLocked = false;
             lockToggle.SetValueWithoutNotify(false);
