@@ -1,4 +1,5 @@
 using ReaCS.Runtime.Internal;
+using ReaCS.Runtime.Internal.Debugging;
 using System;
 using UnityEngine;
 
@@ -36,14 +37,26 @@ namespace ReaCS.Runtime
 
                 if (!Equals(this.value, value))
                 {
+                    var oldValue = this.value;
                     ReaCSDebug.Log($"[Observable] Value changed from {this.value} to {value}");
 
                     this.value = value;
+
+                    if (Application.isPlaying)
+                    {
+                        ReaCSHistory.Log(
+                            owner,
+                            fieldName,
+                            oldValue,
+                            value,
+                            SystemContext.ActiveSystemName ?? "Editor Change"
+                        );
+                    }
+
                     OnChanged?.Invoke(value);
                     owner?.MarkDirty(fieldName);
 
 #if UNITY_EDITOR
-                    // Invoke field changed for Editor Graph View Live Debugging
                     ObservableEditorBridge.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
 #endif
                 }

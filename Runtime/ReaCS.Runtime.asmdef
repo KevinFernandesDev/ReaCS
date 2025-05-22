@@ -3,7 +3,8 @@
     "rootNamespace": "ReaCS",
     "references": [
         "GUID:1b0c216f73abfa14ab46297a36a1ed41",
-        "GUID:218167bb2d1a558449816708b0e5a06e"
+        "GUID:218167bb2d1a558449816708b0e5a06e",
+        "GUID:b3c0bb48eb770d54c94c1985445a753a"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

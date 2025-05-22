@@ -12,11 +12,11 @@ namespace ReaCS.Runtime
 
         public static void Register(ObservableScriptableObject so)
         {
-#if UNITY_EDITOR
-            if (!Application.isPlaying) return;
+/*#if UNITY_EDITOR
+            if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
 #else
             if (!Application.isPlaying) return;
-#endif
+#endif*/
             var type = so.GetType();
             if (!_instances.TryGetValue(type, out var list))
             {
@@ -33,11 +33,11 @@ namespace ReaCS.Runtime
 
         public static void Unregister(ObservableScriptableObject so)
         {
-#if UNITY_EDITOR
-            if (!Application.isPlaying) return;
+/*#if UNITY_EDITOR
+            if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
 #else
             if (!Application.isPlaying) return;
-#endif
+#endif*/
             var type = so.GetType();
             if (_instances.TryGetValue(type, out var list))
             {

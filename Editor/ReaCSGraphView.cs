@@ -30,6 +30,7 @@ namespace ReaCS.Editor
         private Dictionary<Node, string> nodeToId = new();
         private Dictionary<string, List<string>> fieldToFieldGraph = new();
         private readonly Dictionary<Node, Color> originalNodeColors = new();
+        private bool _isAnimatingView = false;
 
         private string currentFilter = "";
 
@@ -87,8 +88,8 @@ namespace ReaCS.Editor
             Add(helpLabel);
 
             // === Shortcut Help Banner ===
-            var editorSystemWarningLabel = new Label("When in EditMode 'Systems' won't react but you can still see every 'System' in the project reacting to an 'Observable' field that changed for debug purposes.\n" +
-                "When in PlayMode only the 'Systems' present in the current opened seens will be visible and they will react normally to an 'Observable' changing.")
+            var editorSystemWarningLabel = new Label("When in EditMode 'Systems' won't trigger their behaviour but you can still see every 'System' in the project reacting to an 'Observable' field that changed for debug purposes.\n" +
+                "When in PlayMode only the 'Systems' that are in the current opened scenes will be visible and they will react and trigger their behavior normally to an 'Observable' changing.")
             {
                 style = {
                     fontSize = 10,
@@ -239,7 +240,8 @@ namespace ReaCS.Editor
         }
 
         public void Populate()
-        {            
+        {
+            originalNodeColors.Clear();
             var previousActiveEdges = new Dictionary<FlowingEdge, double>(activePulseEdges);
             var previousChanged = new Dictionary<string, float>(changedTimestamps);
 
@@ -272,6 +274,7 @@ namespace ReaCS.Editor
 
             schedule.Execute(UpdatePulse).Every(16);
             UpdateFieldLabels();
+            schedule.Execute(() => AnimateFrameAllNodes()).ExecuteLater(100);
         }
 
         public void Populate(HashSet<string> visibleNodes)
@@ -308,6 +311,7 @@ namespace ReaCS.Editor
 
             schedule.Execute(UpdatePulse).Every(16);
             UpdateFieldLabels();
+            schedule.Execute(() => AnimateFrameAllNodes()).ExecuteLater(100);
         }
 
         private void InternalPopulate(HashSet<string> filter = null)
@@ -457,7 +461,6 @@ namespace ReaCS.Editor
                 originalNodeColors[node] = color;
         }
 
-
         private Node CreateNode(string title, NodeType type, Vector2 position, string nodeId)
         {
             var node = new Node();
@@ -600,7 +603,6 @@ namespace ReaCS.Editor
             return node;
         }
 
-
         private void UpdateFieldLabels()
         {
             foreach (var kvp in fieldValueLabels)
@@ -654,7 +656,6 @@ namespace ReaCS.Editor
                 }
             }
         }
-
         private Texture2D MakeDottedLineTexture()
         {
             var tex = new Texture2D(4, 1);
@@ -731,6 +732,15 @@ namespace ReaCS.Editor
             ScrollToNode(systemType.Name);
         }
 
+        #region Zoom & Pan Focus
+        public void AnimateFrameAllNodes(long delayMs = 100, float padding = 50f)
+        {
+            schedule.Execute(() =>
+            {
+                FrameAllNodes(padding);
+            }).ExecuteLater(delayMs);
+        }
+
         public void ScrollToNode(string nodeId)
         {
             if (nodeMap.TryGetValue(nodeId, out var node))
@@ -739,8 +749,180 @@ namespace ReaCS.Editor
                 AddToSelection(node);
 
                 // This line triggers Unity's FrameSelected shortcut behavior
-                FrameSelection();
+                ZoomToNode(nodeId);
             }
+        }
+
+        public void ZoomToNode(string nodeId, float padding = 40f)
+        {
+            if (!nodeMap.TryGetValue(nodeId, out var node))
+                return;
+
+            var rect = node.GetPosition();
+
+            // Expand a little padding around the node
+            rect.xMin -= padding;
+            rect.yMin -= padding;
+            rect.xMax += padding;
+            rect.yMax += padding;
+
+            ZoomToRect(rect);
+        }
+
+        private void AnimateZoomAndPan(Vector2 targetOffset, Vector3 targetScale, float duration = 2f)
+        {
+            if (_isAnimatingView) return;
+
+            _isAnimatingView = true;
+
+            Vector2 startOffset = contentViewContainer.resolvedStyle.translate;
+            Vector3 startScale = contentViewContainer.resolvedStyle.scale.value;
+
+            double startTime = EditorApplication.timeSinceStartup;
+
+            void Step()
+            {
+                double now = EditorApplication.timeSinceStartup;
+                float elapsed = (float)(now - startTime);
+
+                // Ease the animation with some bounce
+                float rawT = Mathf.Clamp01((float)(EditorApplication.timeSinceStartup - startTime) / duration);
+                float easedT = EaseOutBack(rawT);
+
+                easedT = Mathf.SmoothStep(0, 1, easedT);
+
+                Vector2 newOffset = Vector2.LerpUnclamped(startOffset, targetOffset, EaseOutBack(easedT));
+                Vector3 newScale = Vector3.LerpUnclamped(startScale, targetScale, EaseOutBack(easedT));
+
+                UpdateViewTransform(newOffset, newScale);
+
+                if (easedT >= 1f)
+                {
+                    EditorApplication.update -= Step;
+                    _isAnimatingView = false;
+                }
+            }
+
+            EditorApplication.update += Step;
+        }
+       
+        public void FrameAllNodes(float padding = 50f)
+        {
+            var nodeRects = graphElements
+                .OfType<Node>()
+                .Select(n => n.GetPosition())
+                .ToList();
+
+            if (nodeRects.Count == 0) return;
+
+            var totalBounds = EncapsulateAll(nodeRects);
+
+            // Add padding
+            totalBounds.xMin -= padding;
+            totalBounds.yMin -= padding;
+            totalBounds.xMax += padding;
+            totalBounds.yMax += padding;
+
+            ZoomToRect(totalBounds);
+        }
+
+        private static Rect EncapsulateAll(IEnumerable<Rect> rects)
+        {
+            var enumerator = rects.GetEnumerator();
+            if (!enumerator.MoveNext()) return Rect.zero;
+
+            var total = enumerator.Current;
+            while (enumerator.MoveNext())
+            {
+                total = RectUtils.Encapsulate(total, enumerator.Current);
+            }
+
+            return total;
+        }
+
+        public static class RectUtils
+        {
+            public static Rect Encapsulate(Rect a, Rect b)
+            {
+                float xMin = Mathf.Min(a.xMin, b.xMin);
+                float yMin = Mathf.Min(a.yMin, b.yMin);
+                float xMax = Mathf.Max(a.xMax, b.xMax);
+                float yMax = Mathf.Max(a.yMax, b.yMax);
+                return Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+            }
+        }
+
+        private void ZoomToRect(Rect rect)
+        {
+            var viewSize = layout.size;
+
+            float zoomX = viewSize.x / rect.width;
+            float zoomY = viewSize.y / rect.height;
+            float targetZoom = Mathf.Min(zoomX, zoomY);
+            targetZoom = Mathf.Clamp(targetZoom, minScale, maxScale);
+
+            Vector2 center = rect.center;
+            Vector2 targetOffset = viewSize / 2f - center * targetZoom;
+
+            AnimateZoomAndPan(targetOffset, new Vector3(targetZoom, targetZoom, Mathf.PI));
+        }
+
+        public static float EaseOutBack(float t, float overshoot = 1.70158f)
+        {
+            t -= 1;
+            return t * t * ((overshoot + 1) * t + overshoot) + 1;
+        }
+        #endregion
+
+        public HashSet<string> BuildFilterSetForSO(ObservableScriptableObject so)
+        {
+            var visibleNodes = new HashSet<string> { so.name };
+
+            var fields = so.GetType()
+                .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(f => Attribute.IsDefined(f, typeof(ObservableAttribute)) || Attribute.IsDefined(f, typeof(ObservableSavedAttribute)));
+
+            foreach (var field in fields)
+            {
+                string fieldId = $"{so.name}.{field.Name}";
+                visibleNodes.Add(fieldId);
+
+                foreach (var system in AppDomain.CurrentDomain.GetAssemblies()
+                             .SelectMany(a => a.GetTypes())
+                             .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract))
+                {
+                    var attr = system.GetCustomAttribute<ReactToAttribute>();
+                    if (attr?.FieldName == field.Name &&
+                        system.BaseType?.GetGenericArguments()[0].IsAssignableFrom(so.GetType()) == true)
+                    {
+                        visibleNodes.Add(system.Name);
+                    }
+                }
+            }
+
+            return visibleNodes;
+        }
+
+        public HashSet<string> BuildFilterSetForSystem(Type systemType)
+        {
+            var visibleNodes = new HashSet<string> { systemType.Name };
+
+            var attr = systemType.GetCustomAttribute<ReactToAttribute>();
+            if (attr != null)
+            {
+                foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+                {
+                    var field = so.GetType().GetField(attr.FieldName,
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    if (field != null)
+                    {
+                        visibleNodes.Add(so.name);
+                        visibleNodes.Add($"{so.name}.{field.Name}");
+                    }
+                }
+            }
+
+            return visibleNodes;
         }
 
         private void PingNodeAsset(Node node)

@@ -4,7 +4,8 @@
     "references": [
         "ReaCS.Runtime",
         "ReaCS.Runtime.Internal",
-        "ReaCS.Shared"
+        "ReaCS.Shared",
+        "ReaCS.Runtime.Internal.Debugging"
     ],
     "includePlatforms": [
         "Editor"

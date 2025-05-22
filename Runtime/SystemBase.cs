@@ -1,5 +1,6 @@
 ﻿using ReaCS.Runtime.Internal;
 using ReaCS.Shared;
+using System.Collections;
 using System.Reflection;
 using UnityEngine;
 
@@ -15,6 +16,15 @@ namespace ReaCS.Runtime
         private bool IsInActiveScene()
         {
             return gameObject.scene.IsValid() && gameObject.activeInHierarchy;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void ReconnectSystems()
+        {
+            foreach (var system in FindObjectsByType<SystemBase<TSO>>(FindObjectsSortMode.InstanceID))
+            {
+                system.Start();
+            }
         }
 
 #if UNITY_EDITOR
@@ -51,6 +61,11 @@ namespace ReaCS.Runtime
             ObservableRegistry.OnRegistered += HandleNewSO;
             ObservableRegistry.OnUnregistered += HandleRemovedSO;
 
+            StartCoroutine(DeferredSubscribe());
+        }
+        private IEnumerator DeferredSubscribe()
+        {
+            yield return null; // wait one frame
             SubscribeAll();
         }
 
@@ -125,12 +140,14 @@ namespace ReaCS.Runtime
 
         private void HandleChange(ObservableScriptableObject so, string fieldName)
         {
+            Debug.Log($"[SystemBase] {GetType().Name} handling change for {fieldName}");
             if (!Application.isPlaying) return;
 
             if (fieldName == _observedField)
             {
-                ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
-                OnFieldChanged((TSO)so);
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}"); 
+                Debug.Log($"[SystemBase] Matching field! Pushing system context: {GetType().Name}");
+                SystemContext.WithSystem(GetType().Name, () => OnFieldChanged((TSO)so));
             }
         }
 

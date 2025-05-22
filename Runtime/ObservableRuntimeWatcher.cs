@@ -26,6 +26,12 @@ namespace ReaCS.Runtime
 
         public static void Register(ObservableScriptableObject obj)
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
+#else
+            if (!Application.isPlaying) return;
+#endif
+
             _observables.Add(obj);
         }
 
