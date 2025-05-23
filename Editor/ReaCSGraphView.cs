@@ -31,15 +31,25 @@ namespace ReaCS.Editor
         private Dictionary<string, List<string>> fieldToFieldGraph = new();
         private readonly Dictionary<Node, Color> originalNodeColors = new();
         private Dictionary<string, string> fieldLastChangedBySO = new(); 
-        private Dictionary<string, Label> fieldValueLastSO = new(); 
-
+        private Dictionary<string, Label> fieldValueLastSO = new();
         private string focusedSOName = null;
         private string currentFocusedSOName = null;
         private bool _isAnimatingView = false;
+        private string currentFilter = "";
+
+        // Refactoring for optimization
+        private ObservableScriptableObject[] cachedSOs = Array.Empty<ObservableScriptableObject>();
+        private readonly Dictionary<Node, List<FlowingEdge>> edgesFromNode = new();
+        private Dictionary<string, string> soNameToType = new(); // SO name ➝ type name cache
+        private Dictionary<(Type, string), FieldInfo> fieldInfoCache = new(); // (Type, FieldName) ➝ FieldInfo cache                                                                              
+        private readonly Stack<Node> nodePool = new(); // Pools to reuse node elements
+        private readonly Stack<FlowingEdge> edgePool = new(); // Pools to reuse edges elements
+        private readonly Dictionary<(Type, string), FieldInfo> fieldDictInfoCache = new();
+        private Dictionary<Type, PropertyInfo> valuePropCache = new(); // Value property cache
+
+
 
         float CenteredStartY(float centerY, int count, float spacing) => centerY - (count * spacing) / 2f;
-
-        private string currentFilter = "";
 
         public ReaCSGraphView()
         {
@@ -139,6 +149,16 @@ namespace ReaCS.Editor
             Debug.LogWarning($"[ReaCS] Could not find style sheet '{resourceName}' in Resources or '{packageRelativePath}' in Package.");
         }
 
+        private Node GetPooledNode()
+        {
+            return nodePool.Count > 0 ? nodePool.Pop() : new Node();
+        }
+
+        private FlowingEdge GetPooledEdge()
+        {
+            return edgePool.Count > 0 ? edgePool.Pop() : new FlowingEdge();
+        }
+
         public void Filter(string filter)
         {
             currentFilter = string.IsNullOrEmpty(filter) ? "" : filter.ToLower();
@@ -189,16 +209,11 @@ namespace ReaCS.Editor
             Populate(matchedIds);
         }
 
-
-
         public void SetFocusedSO(string soName)
         {
             currentFocusedSOName = soName;
             UpdateFieldLabels();
         }
-
-
-
 
         private void UpdatePulse()
         {
@@ -264,7 +279,6 @@ namespace ReaCS.Editor
             }
         }
 
-
         public void Populate(bool isInitialLoad = false, bool triggerPulse = false)
         {
             PopulateInternal(null, isInitialLoad, triggerPulse);
@@ -281,13 +295,26 @@ namespace ReaCS.Editor
             var previousActiveEdges = new Dictionary<FlowingEdge, double>(activePulseEdges);
             var previousChanged = new Dictionary<string, float>(changedTimestamps);
 
-            graphElements.ToList().ForEach(RemoveElement);
+            // Pooling nodes for performance
+            foreach (var node in nodeMap.Values)
+                nodePool.Push(node);
+
+            // Pooling edges for performance
+            foreach (var edge in allFlowingEdges)
+                edgePool.Push(edge);
+
+            graphElements.ToList().ForEach(RemoveElement); 
+
             nodeMap.Clear();
             changedTimestamps.Clear();
             activePulseEdges.Clear();
             allFlowingEdges.Clear();
             fieldToSO.Clear();
             systemToSO.Clear();
+
+            cachedSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
+            soNameToType = cachedSOs.ToDictionary(s => s.name, s => s.GetType().Name);
+            fieldInfoCache.Clear();
 
             if (visibleNodes != null)
                 CorePopulate(visibleNodes);
@@ -300,8 +327,8 @@ namespace ReaCS.Editor
                 string soName = kvp.Value;
                 string fieldName = fieldId.Split('.').Last();
 
-                var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                                     .FirstOrDefault(s => s.name == soName);
+                var soObj = cachedSOs.FirstOrDefault(s => s.name == soName);
+
                 if (soObj == null) continue;
 
                 string groupedFieldId = $"group:{soObj.GetType().Name}.{fieldName}";
@@ -374,8 +401,7 @@ namespace ReaCS.Editor
             fieldLastChangedBySO[fieldId] = soName;
             fieldLastChangedBySO[groupedFieldId] = soName;
 
-            var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                                 .FirstOrDefault(s => s.name == soName);
+            var soObj = cachedSOs.FirstOrDefault(s => s.name == soName);
             if (soObj != null)
             {
                 lastFieldValues[fieldId] = TryGetFieldValue(soObj, fieldName);
@@ -389,8 +415,6 @@ namespace ReaCS.Editor
             UpdatePulse();
             UpdateFieldLabels();
         }
-
-
 
         private void PulseConnectedEdges(string primaryFieldId)
         {
@@ -457,36 +481,45 @@ namespace ReaCS.Editor
             }
         }
 
-
-
-
-
-
-
         private string GetSOType(string soName)
         {
-            var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                              .FirstOrDefault(s => s.name == soName);
-            return so?.GetType().Name ?? "UnknownSOType";
+            return soNameToType.TryGetValue(soName, out var type) ? type : "UnknownSOType";
         }
 
         private object TryGetFieldValue(ObservableScriptableObject so, string fieldName)
         {
-            var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (field == null) return null;
+            if (so == null || string.IsNullOrEmpty(fieldName))
+                return null;
+
+            var fieldKey = (so.GetType(), fieldName);
+
+            if (!fieldDictInfoCache.TryGetValue(fieldKey, out var field))
+            {
+                field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field == null) return null;
+                fieldDictInfoCache[fieldKey] = field;
+            }
 
             var observable = field.GetValue(so);
             if (observable == null) return null;
 
-            var valueProp = observable.GetType().GetProperty("Value");
+            var obsType = observable.GetType();
+            if (!valuePropCache.TryGetValue(obsType, out var valueProp))
+            {
+                valueProp = obsType.GetProperty("Value");
+                valuePropCache[obsType] = valueProp;
+            }
+
             return valueProp?.GetValue(observable);
         }
 
 
 
+
+
         private void CorePopulate(HashSet<string> filter = null)
         {
-            var allSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
+            var allSOs = cachedSOs;
             var allSystemTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
                 .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
@@ -517,7 +550,7 @@ namespace ReaCS.Editor
             if (filter != null)
             {
                 var allowedTypes = new HashSet<Type>(
-                    Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                    cachedSOs
                         .Where(so =>
                             filter.Contains(so.name) ||
                             GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
@@ -616,8 +649,6 @@ namespace ReaCS.Editor
                 float localY = y;
                 foreach (var so in matchingSOs)
                 {
-                    Debug.Log($"[ReaCS] Processing group: {soType} with {allTypeSOs.Count} SOs");
-
                     var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xGroup + 20, localY), so.name);
                     nodeMap[so.name] = soNode;
                     AddElement(soNode);
@@ -870,10 +901,15 @@ namespace ReaCS.Editor
                 originalNodeColors[node] = color;
         }
 
-        // Updated to avoid false 'null' in grouped fields
         private Node CreateNode(string title, NodeType type, Vector2 position, string nodeId)
         {
-            var node = new Node();
+            // Get Pooled nodes for performance
+            var node = GetPooledNode();
+
+            // Cleanup reused nodes from pool
+            node.inputContainer.Clear();
+            node.outputContainer.Clear();
+            node.extensionContainer.Clear();
 
             var input = Port.Create<Edge>(Orientation.Horizontal, Direction.Input, Port.Capacity.Multi, typeof(float));
             input.portName = "In";
@@ -912,8 +948,7 @@ namespace ReaCS.Editor
 
                 if (!string.IsNullOrEmpty(soName) && !string.IsNullOrEmpty(fieldName))
                 {
-                    var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                        .FirstOrDefault(s => s.name == soName);
+                    var so = cachedSOs.FirstOrDefault(s => s.name == soName);
 
                     if (so != null)
                     {
@@ -968,8 +1003,7 @@ namespace ReaCS.Editor
 
                 if (!string.IsNullOrEmpty(fieldName) && !string.IsNullOrEmpty(soName))
                 {
-                    var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                        .FirstOrDefault(s => s.name == soName);
+                    var so = cachedSOs.FirstOrDefault(s => s.name == soName);
                     if (so != null)
                     {
                         var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1032,8 +1066,7 @@ namespace ReaCS.Editor
                     .Where(kvp => kvp.Key.EndsWith($".{fieldName}"))
                     .Where(kvp =>
                     {
-                        var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                                             .FirstOrDefault(s => s.name == kvp.Value);
+                        var soObj = cachedSOs.FirstOrDefault(s => s.name == kvp.Value);
                         return soObj != null && soObj.GetType().Name == typeName;
                     });
 
@@ -1043,7 +1076,6 @@ namespace ReaCS.Editor
 
             return null;
         }
-
 
         private void UpdateFieldLabels()
         {
@@ -1076,8 +1108,7 @@ namespace ReaCS.Editor
                 if (string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(soName))
                     continue;
 
-                var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                                  .FirstOrDefault(s => s.name == soName);
+                var so = cachedSOs.FirstOrDefault(s => s.name == soName);
                 if (so == null) continue;
 
                 var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1098,7 +1129,7 @@ namespace ReaCS.Editor
                 fieldLastChangedBySO[fieldId] = soName; // ensure both group and raw are synced
                 ReaCSDebug.Log($"[UpdateFieldLabels] {fieldId} (resolved: {resolvedFieldId}) → Value from SO: {soName} = {valueStr}");
 
-                label.text = valueStr;
+                label.text = valueStr ?? "--"; ;
 
                 // 🟢 Update icon
                 if (fieldValueIcons.TryGetValue(fieldId, out var iconElem) ||
@@ -1138,8 +1169,6 @@ namespace ReaCS.Editor
             }
         }
 
-
-
         private Texture2D MakeDottedLineTexture()
         {
             var tex = new Texture2D(4, 1);
@@ -1158,11 +1187,9 @@ namespace ReaCS.Editor
 
         private FlowingEdge Connect(Port from, Port to, Action<FlowingEdge> customize = null)
         {
-            var edge = new FlowingEdge
-            {
-                output = from,
-                input = to
-            };
+            var edge = GetPooledEdge();
+            edge.output = from;
+            edge.input = to;
 
             from.Connect(edge);
             to.Connect(edge);
@@ -1170,11 +1197,18 @@ namespace ReaCS.Editor
 
             allFlowingEdges.Add(edge);
 
-            // Optional styling hook
-            customize?.Invoke(edge);
+            var node = from.node;
+            if (node != null)
+            {
+                if (!edgesFromNode.TryGetValue(node, out var list))
+                    edgesFromNode[node] = list = new List<FlowingEdge>();
+                list.Add(edge);
+            }
 
+            customize?.Invoke(edge);
             return edge;
         }
+
 
         public void ClearAllHighlights()
         {
@@ -1206,7 +1240,7 @@ namespace ReaCS.Editor
 
             foreach (var attr in reactAttributes)
             {
-                foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+                foreach (var so in cachedSOs)
                 {
                     if (!soType.IsAssignableFrom(so.GetType())) continue;
 
@@ -1415,8 +1449,6 @@ namespace ReaCS.Editor
             return visible;
         }
 
-
-
         public HashSet<string> BuildFilterSetForSystem(Type systemType)
         {
             var visible = new HashSet<string>();
@@ -1433,7 +1465,7 @@ namespace ReaCS.Editor
             var soType = systemType.BaseType?.GetGenericArguments()[0];
             if (soType == null) return visible;
 
-            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+            foreach (var so in cachedSOs)
             {
                 if (!soType.IsAssignableFrom(so.GetType())) continue;
 
@@ -1454,9 +1486,6 @@ namespace ReaCS.Editor
 
             return visible;
         }
-
-
-
 
         private void PingNodeAsset(Node node)
         {
@@ -1481,8 +1510,7 @@ namespace ReaCS.Editor
 
                         if (string.IsNullOrEmpty(soName)) return;
 
-                        var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                            .FirstOrDefault(s => s.name == soName);
+                        var so = cachedSOs.FirstOrDefault(s => s.name == soName);
 
                         if (so != null)
                             EditorGUIUtility.PingObject(so);
