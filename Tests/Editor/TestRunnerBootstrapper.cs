@@ -1,7 +1,7 @@
 using ReaCS.Runtime;
 using UnityEditor;
 
-namespace ReaCS.Tests.Shared
+namespace ReaCS.Tests.Editor
 {
     [InitializeOnLoad]
     public static class TestRunnerBootstrapper

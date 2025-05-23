@@ -5,7 +5,10 @@
         "ReaCS.Runtime",
         "ReaCS.Runtime.Internal",
         "ReaCS.Shared",
-        "ReaCS.Runtime.Internal.Debugging"
+        "ReaCS.Runtime.Internal.Debugging",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics"
     ],
     "includePlatforms": [
         "Editor"

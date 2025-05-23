@@ -37,6 +37,8 @@ namespace ReaCS.Editor
             ReaCSSettings.EnableVisualGraphEditModeReactions = true;
             ObservableEditorBridge.OnEditorFieldChanged += MarkFieldChangedFromRuntime;
             Selection.selectionChanged += OnSelectionChanged;
+            ReaCSBurstHistory.OnEditorLogUpdated += RefreshHistoryView;
+
             rootVisualElement.Clear();
 
             var layout = new VisualElement { 
@@ -202,7 +204,7 @@ namespace ReaCS.Editor
 
             var clearButton = new Button(() =>
             {
-                ReaCSHistory.Clear();
+                ReaCSBurstHistory.Clear();
                 RefreshHistoryView();
             })
             {
@@ -237,48 +239,54 @@ namespace ReaCS.Editor
         {
             _historyDrawer.Clear();
 
-            foreach (var entry in ReaCSHistory.Entries)
+            var entries = ReaCSBurstHistory.ToArray();
+            if (entries == null || entries.Length == 0) return;
+
+            foreach (var entry in entries)
             {
+                string soName = entry.soName.ToString();
+                string fieldName = entry.fieldName.ToString();
+                string systemName = entry.systemName.ToString();
+                string fieldId = $"{soName}.{fieldName}";
+
                 if (!string.IsNullOrWhiteSpace(_searchQuery))
                 {
                     string q = _searchQuery.ToLowerInvariant();
-                    if (!entry.soName.ToLowerInvariant().Contains(q) &&
-                        !entry.fieldName.ToLowerInvariant().Contains(q) &&
-                        !entry.systemName.ToLowerInvariant().Contains(q))
+                    if (!soName.ToLowerInvariant().Contains(q) &&
+                        !fieldName.ToLowerInvariant().Contains(q) &&
+                        !systemName.ToLowerInvariant().Contains(q))
                         continue;
                 }
-
-                var fieldId = $"{entry.soName}.{entry.fieldName}";
 
                 var container = new VisualElement
                 {
                     pickingMode = PickingMode.Position,
                     focusable = true,
                     style =
-                    {
-                        backgroundColor = new Color(0.18f, 0.18f, 0.18f),
-                        marginBottom = 4,
-                        paddingTop = 4,
-                        paddingBottom = 4,
-                        paddingLeft = 6,
-                        paddingRight = 6,
-                        borderBottomWidth = 1,
-                        borderBottomColor = new Color(0.05f, 0.05f, 0.05f),
-                        borderLeftWidth = 2,
-                        borderLeftColor = Color.green,
-                        unityFontStyleAndWeight = FontStyle.Normal,
-                        cursor = new StyleCursor((StyleKeyword)MouseCursor.Link),
-                        whiteSpace = WhiteSpace.Normal,
-                        minHeight = 50,
-                        flexGrow = 0,
-                        flexDirection = FlexDirection.Column
-                    }
+            {
+                backgroundColor = new Color(0.18f, 0.18f, 0.18f),
+                marginBottom = 4,
+                paddingTop = 4,
+                paddingBottom = 4,
+                paddingLeft = 6,
+                paddingRight = 6,
+                borderBottomWidth = 1,
+                borderBottomColor = new Color(0.05f, 0.05f, 0.05f),
+                borderLeftWidth = 2,
+                borderLeftColor = Color.green,
+                unityFontStyleAndWeight = FontStyle.Normal,
+                cursor = new StyleCursor((StyleKeyword)MouseCursor.Link),
+                whiteSpace = WhiteSpace.Normal,
+                minHeight = 50,
+                flexGrow = 0,
+                flexDirection = FlexDirection.Column
+            }
                 };
 
                 container.RegisterCallback<MouseEnterEvent>(_ =>
                 {
                     container.style.backgroundColor = new Color(0.25f, 0.25f, 0.25f);
-                    graphView?.ScrollToNode(fieldId); // Preview frame
+                    graphView?.ScrollToNode(fieldId);
                 });
 
                 container.RegisterCallback<MouseLeaveEvent>(_ =>
@@ -286,46 +294,43 @@ namespace ReaCS.Editor
                     container.style.backgroundColor = new Color(0.18f, 0.18f, 0.18f);
                 });
 
-                var fieldLine = new Label($"🔹 {entry.soName}.{entry.fieldName}")
+                var fieldLine = new Label($"🔹 {soName}.{fieldName}")
                 {
-                    pickingMode = PickingMode.Ignore,
                     style = {
-                    unityFontStyleAndWeight = FontStyle.Bold,
-                    fontSize = 12,
-                    marginBottom = 2,
-                    }
+                unityFontStyleAndWeight = FontStyle.Bold,
+                fontSize = 12,
+                marginBottom = 2
+            }
                 };
                 container.Add(fieldLine);
 
-                var valueLine = new Label($"→ {entry.oldValue} → {entry.newValue}")
+                var valueLine = new Label($"→ {entry.debugOld:F2} → {entry.debugNew:F2}")
                 {
-                    pickingMode = PickingMode.Ignore,
                     style = {
-                        fontSize = 11,
-                        color = new Color(0.8f, 0.85f, 0.95f),
-                        marginBottom = 2
-                    }
+                fontSize = 11,
+                color = new Color(0.8f, 0.85f, 0.95f),
+                marginBottom = 2
+            }
                 };
                 container.Add(valueLine);
 
-                var systemLine = new Label($"👤 {entry.systemName}  •  Frame {entry.frame}")
+                var systemLine = new Label($"👤 {systemName}  •  Frame {entry.frame}")
                 {
-                    pickingMode = PickingMode.Ignore,
                     style = {
-                        fontSize = 10,
-                        color = new Color(0.6f, 0.6f, 0.6f)
-                    }
+                fontSize = 10,
+                color = new Color(0.6f, 0.6f, 0.6f)
+            }
                 };
                 container.Add(systemLine);
 
                 container.RegisterCallback<MouseDownEvent>(evt =>
                 {
-                    if ((evt.ctrlKey || evt.commandKey) && !string.IsNullOrWhiteSpace(entry.systemName) && entry.systemName != "Unknown")
+                    if ((evt.ctrlKey || evt.commandKey) && !string.IsNullOrWhiteSpace(systemName) && systemName != "Unknown")
                     {
                         var type = AppDomain.CurrentDomain
                             .GetAssemblies()
                             .SelectMany(a => a.GetTypes())
-                            .FirstOrDefault(t => t.Name == entry.systemName);
+                            .FirstOrDefault(t => t.Name == systemName);
 
                         if (type != null)
                         {
@@ -338,26 +343,27 @@ namespace ReaCS.Editor
                                 if (script != null && script.GetClass() == type)
                                 {
                                     AssetDatabase.OpenAsset(script);
-                                    Debug.Log($"[ReaCS] ✍️ Opened script for system: {entry.systemName}");
+                                    Debug.Log($"[ReaCS] ✍️ Opened script for system: {systemName}");
                                     break;
                                 }
                             }
 #endif
                         }
 
-                        evt.StopPropagation(); // don't trigger regular click
+                        evt.StopPropagation();
                         return;
                     }
 
                     graphView?.ScrollToNode(fieldId);
 #if UNITY_EDITOR
-                    ObservableEditorBridge.OnEditorFieldChanged?.Invoke(entry.soName, entry.fieldName);
+                    ObservableEditorBridge.OnEditorFieldChanged?.Invoke(soName, fieldName);
 #endif
                 });
 
                 _historyDrawer.Add(container);
             }
         }
+
 
 
         private void Update()
@@ -486,7 +492,9 @@ namespace ReaCS.Editor
 
         private void OnDisable()
         {
+            ObservableEditorBridge.OnEditorFieldChanged -= MarkFieldChangedFromRuntime;
             Selection.selectionChanged -= OnSelectionChanged;
+            ReaCSBurstHistory.OnEditorLogUpdated -= RefreshHistoryView;
             rootVisualElement.Clear();
             ReaCSSettings.EnableVisualGraphEditModeReactions = false;
         }

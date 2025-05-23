@@ -1,26 +1,35 @@
 using ReaCS.Runtime.Internal;
 using ReaCS.Runtime.Internal.Debugging;
 using System;
+using Unity.Collections;
 using UnityEngine;
 
 namespace ReaCS.Runtime
 {
-    public interface IInitializableObservable
-    {
-        void Init(ObservableScriptableObject owner, string fieldName);
-    }
-
     [Serializable]
     public class Observable<T> : IInitializableObservable
     {
         [SerializeField] public bool ShouldPersist = false;
-
         [SerializeField] private T value;
+
         [NonSerialized] private ObservableScriptableObject owner;
         [NonSerialized] private string fieldName;
 
+        private static readonly bool _enableDebug =
+#if UNITY_EDITOR
+            true;
+#else
+            false;
+#endif
 
-        public event Action<T> OnChanged;
+        private static readonly bool _logHistory = true;
+
+        private Action<T> _onChanged;
+        public event Action<T> OnChanged
+        {
+            add => _onChanged += value;
+            remove => _onChanged -= value;
+        }
 
         public void Init(ObservableScriptableObject owner, string fieldName)
         {
@@ -33,33 +42,47 @@ namespace ReaCS.Runtime
             get => value;
             set
             {
-                ReaCSDebug.Log($"[Observable] Attempting to set {fieldName} to {value} (was {this.value})");
-
                 if (!Equals(this.value, value))
                 {
                     var oldValue = this.value;
-                    ReaCSDebug.Log($"[Observable] Value changed from {this.value} to {value}");
-
                     this.value = value;
 
-                    if (Application.isPlaying)
-                    {
-                        ReaCSHistory.Log(
-                            owner,
-                            fieldName,
-                            oldValue,
-                            value,
-                            SystemContext.ActiveSystemName ?? "Editor Change"
-                        );
-                    }
+                    if (_logHistory && Application.isPlaying)
+                        LogToBurstHistory(oldValue, value);
 
-                    OnChanged?.Invoke(value);
+                    _onChanged?.Invoke(value);
                     owner?.MarkDirty(fieldName);
 
 #if UNITY_EDITOR
                     ObservableRegistry.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
 #endif
                 }
+            }
+        }
+
+        private void LogToBurstHistory(T oldVal, T newVal)
+        {
+            var so = new FixedString64Bytes(owner?.name ?? "null");
+            var field = new FixedString64Bytes(fieldName);
+            var sys = new FixedString64Bytes(SystemContext.ActiveSystemName ?? "Unknown");
+
+            switch (oldVal)
+            {
+                case float fOld when newVal is float fNew:
+                    ReaCSBurstHistory.LogFloat(so, field, fOld, fNew, sys);
+                    return;
+                case int iOld when newVal is int iNew:
+                    ReaCSBurstHistory.LogInt(so, field, iOld, iNew, sys);
+                    return;
+                case bool bOld when newVal is bool bNew:
+                    ReaCSBurstHistory.LogBool(so, field, bOld, bNew, sys);
+                    return;
+                case Vector2 v2Old when newVal is Vector2 v2New:
+                    ReaCSBurstHistory.LogVector2(so, field, v2Old, v2New, sys);
+                    return;
+                case Vector3 v3Old when newVal is Vector3 v3New:
+                    ReaCSBurstHistory.LogVector3(so, field, v3Old, v3New, sys);
+                    return;
             }
         }
     }

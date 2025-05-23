@@ -1,5 +1,9 @@
 ﻿using ReaCS.Runtime.Internal;
+using System;
 using System.Collections.Generic;
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Jobs;
 using UnityEngine;
 
 namespace ReaCS.Runtime
@@ -7,14 +11,32 @@ namespace ReaCS.Runtime
     [DefaultExecutionOrder(-10000)]
     public class ObservableRuntimeWatcher : MonoBehaviour
     {
-        public static readonly HashSet<ObservableScriptableObject> _observables = new();
-        public static readonly Dictionary<ObservableScriptableObject, float> debounceTimers = new();
-        public static readonly HashSet<ObservableScriptableObject> _debouncedSet = new();
-
         private static ObservableRuntimeWatcher _instance;
 
+        private static Dictionary<ObservableScriptableObject, int> _objectToId = new();
+        private static List<ObservableScriptableObject> _idToObject = new();
+
+        private static NativeList<int> _debouncedIds;
+        private static NativeHashMap<int, float> _debounceTimers;
+        private static NativeList<int> _readyToUpdate;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _objectToId.Clear();
+            _idToObject.Clear();
+
+            if (_debouncedIds.IsCreated) _debouncedIds.Dispose();
+            if (_debounceTimers.IsCreated) _debounceTimers.Dispose();
+            if (_readyToUpdate.IsCreated) _readyToUpdate.Dispose();
+
+            _debouncedIds = new NativeList<int>(100, Allocator.Persistent);
+            _debounceTimers = new NativeHashMap<int, float>(100, Allocator.Persistent);
+            _readyToUpdate = new NativeList<int>(100, Allocator.Persistent);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void Init()
+        internal static void Init()
         {
             if (_instance == null)
             {
@@ -24,64 +46,137 @@ namespace ReaCS.Runtime
             }
         }
 
-        public static void Register(ObservableScriptableObject obj)
+        public static void Register(ObservableScriptableObject so)
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
 #else
             if (!Application.isPlaying) return;
 #endif
+            if (_objectToId.ContainsKey(so)) return;
 
-            _observables.Add(obj);
+            int id = _idToObject.Count;
+            _objectToId[so] = id;
+            _idToObject.Add(so);
         }
 
-        public static void Unregister(ObservableScriptableObject obj)
+        public static void Unregister(ObservableScriptableObject so)
         {
-            _observables.Remove(obj);
-            debounceTimers.Remove(obj);
-            _debouncedSet.Remove(obj);
-        }
-
-        public static void DebounceChange(ObservableScriptableObject obj, float delay)
-        {
-            debounceTimers[obj] = delay;
-            _debouncedSet.Add(obj);
-        }
-
-        public static void ForceUpdate()
-        {
-            foreach (var obj in _observables)
+            if (_objectToId.TryGetValue(so, out int id))
             {
-                ReaCSDebug.Log($"[Watcher] Checking SO: {obj.name}");
+                _objectToId.Remove(so);
+                // Note: we leave _idToObject alone for safety (sparse array)
+                _debounceTimers.Remove(id);
+                RemoveId(_debouncedIds, id);
+                RemoveId(_readyToUpdate, id);
+            }
+        }
 
-                //if (_debouncedSet.Contains(obj)) continue;
-                obj.CheckForChanges();
+        private static void RemoveId(NativeList<int> list, int id)
+        {
+            for (int i = 0; i < list.Length; i++)
+            {
+                if (list[i] == id)
+                {
+                    list.RemoveAtSwapBack(i);
+                    return;
+                }
+            }
+        }
+
+        public static void DebounceChange(ObservableScriptableObject so, float delay)
+        {
+            if (!_objectToId.TryGetValue(so, out int id)) return;
+
+            if (!_debouncedIds.Contains(id))
+                _debouncedIds.Add(id);
+
+            _debounceTimers[id] = delay;
+        }
+
+        [BurstCompile]
+        private struct TickDebounceJob : IJob
+        {
+            public float DeltaTime;
+            public NativeList<int> DebouncedIds;
+            public NativeHashMap<int, float> Timers;
+            public NativeList<int> ReadyIds;
+
+            public void Execute()
+            {
+                for (int i = 0; i < DebouncedIds.Length; i++)
+                {
+                    int id = DebouncedIds[i];
+                    if (!Timers.TryGetValue(id, out float time)) continue;
+
+                    time -= DeltaTime;
+                    if (time <= 0f)
+                    {
+                        ReadyIds.Add(id);
+                        Timers.Remove(id);
+                        DebouncedIds.RemoveAtSwapBack(i);
+                        i--; // Adjust index due to swap
+                    }
+                    else
+                    {
+                        Timers[id] = time;
+                    }
+                }
             }
         }
 
         private void Update()
         {
-            ForceUpdate();
+            if (_debouncedIds.Length == 0)
+                return;
 
-            if (_debouncedSet.Count > 0)
+            var job = new TickDebounceJob
             {
-                var toClear = new List<ObservableScriptableObject>();
-                foreach (var obj in _debouncedSet)
-                {
-                    debounceTimers[obj] -= Time.deltaTime;
-                    if (debounceTimers[obj] <= 0f)
-                    {
-                        obj.CheckForChanges();
-                        toClear.Add(obj);
-                    }
-                }
+                DeltaTime = Time.deltaTime,
+                DebouncedIds = _debouncedIds,
+                Timers = _debounceTimers,
+                ReadyIds = _readyToUpdate
+            };
 
-                foreach (var obj in toClear)
+            job.Run();
+
+            for (int i = 0; i < _readyToUpdate.Length; i++)
+            {
+                int id = _readyToUpdate[i];
+                if (id >= 0 && id < _idToObject.Count)
                 {
-                    _debouncedSet.Remove(obj);
-                    debounceTimers.Remove(obj);
+                    var so = _idToObject[id];
+                    so?.CheckForChanges();
                 }
             }
+
+            _readyToUpdate.Clear();
         }
+
+        private void OnDestroy()
+        {
+            if (_debouncedIds.IsCreated) _debouncedIds.Dispose();
+            if (_debounceTimers.IsCreated) _debounceTimers.Dispose();
+            if (_readyToUpdate.IsCreated) _readyToUpdate.Dispose();
+        }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        public static void ForceUpdate()
+        {
+            foreach (var pair in _objectToId)
+            {
+                pair.Key?.CheckForChanges();
+            }
+        }
+#endif
+#if UNITY_EDITOR
+        public static void MarkAllDirty()
+        {
+            foreach (var pair in _objectToId)
+            {
+                pair.Key?.MarkDirty("TestDirtyAll");
+            }
+        }
+#endif
     }
 }

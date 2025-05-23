@@ -13,6 +13,8 @@
     "type": "library",
     "dependencies": {
         "com.unity.test-framework": "1.5.1",
-        "com.unity.testtools.codecoverage": "1.2.6"
+        "com.unity.testtools.codecoverage": "1.2.6",
+        "com.unity.collections": "2.5.7",
+        "com.unity.burst":"1.8.21"
     }
 }

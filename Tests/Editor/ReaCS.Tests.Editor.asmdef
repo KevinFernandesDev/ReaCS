@@ -1,5 +1,5 @@
 {
-    "name": "ReaCS.Tests.EditMode",
+    "name": "ReaCS.Tests.Editor",
     "rootNamespace": "",
     "references": [
         "ReaCS.Runtime",
