@@ -21,11 +21,17 @@ public class FlowingEdge : Edge
             dot.style.height = 6;
             dot.style.position = Position.Absolute;
             dot.style.opacity = 0f;
-            dot.style.backgroundImage = new StyleBackground(MakeCircleTexture());
             dot.style.visibility = Visibility.Hidden;
+            dot.style.backgroundImage = new StyleBackground(MakeCircleTexture());
+            dot.pickingMode = PickingMode.Ignore;
             trailDots.Add(dot);
             Add(dot);
         }
+
+        RegisterCallback<GeometryChangedEvent>(_ => {
+            foreach (var dot in trailDots)
+                dot.BringToFront();
+        });
     }
 
     public void UpdateTrail(float t)
@@ -46,6 +52,7 @@ public class FlowingEdge : Edge
             dot.style.opacity = 1f - (i / (float)trailDots.Count);
             dot.style.backgroundColor = Color.yellow;
             dot.style.visibility = Visibility.Visible;
+            dot.MarkDirtyRepaint();
         }
     }
 
@@ -55,6 +62,7 @@ public class FlowingEdge : Edge
         {
             dot.style.opacity = 0f;
             dot.style.visibility = Visibility.Hidden;
+            dot.MarkDirtyRepaint();
         }
     }
 

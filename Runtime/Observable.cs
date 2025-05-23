@@ -57,7 +57,7 @@ namespace ReaCS.Runtime
                     owner?.MarkDirty(fieldName);
 
 #if UNITY_EDITOR
-                    ObservableEditorBridge.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
+                    ObservableRegistry.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
 #endif
                 }
             }

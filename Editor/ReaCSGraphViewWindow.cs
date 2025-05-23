@@ -79,7 +79,7 @@ namespace ReaCS.Editor
                     else
                     {
                         AnimateStatus("🧠 Showing: Entire Project");
-                        graphView.Populate();
+                        graphView?.Populate(isInitialLoad: true, triggerPulse: true);
                     }
                 }
             });
@@ -96,7 +96,7 @@ namespace ReaCS.Editor
                 else
                 {
                     AnimateStatus("🧠 Showing: Entire Project");
-                    graphView.Populate();
+                    graphView?.Populate(isInitialLoad: true, triggerPulse: true);
                 }
             })
             { text = "Reset View" };
@@ -120,7 +120,8 @@ namespace ReaCS.Editor
 
             layout.Add(contentRow);
 
-            graphView.Populate();
+            graphView?.Populate(isInitialLoad: true, triggerPulse: true);
+
 
             // Schedule FrameAllNodes after layout finishes
             EditorApplication.delayCall += () =>
@@ -384,7 +385,7 @@ namespace ReaCS.Editor
             else
             {
                 AnimateStatus("🧠 Showing: Entire Project");
-                graphView.Populate(); 
+                graphView?.Populate(isInitialLoad: true, triggerPulse: true);
                 graphView.schedule.Execute(() => graphView.AnimateFrameAllNodes()).ExecuteLater(100);
             }
         }
@@ -404,6 +405,7 @@ namespace ReaCS.Editor
             if (Selection.activeObject is ObservableScriptableObject so)
             {
                 AnimateStatus($"🔬 Focused on: {so.name}.asset");
+                graphView.SetFocusedSO(so.name);
                 graphView?.Populate(graphView.BuildFilterSetForSO(so));
                 graphView.schedule.Execute(() => graphView.AnimateFrameAllNodes()).ExecuteLater(100);
                 return;
@@ -425,7 +427,8 @@ namespace ReaCS.Editor
 
             // fallback to full graph
             AnimateStatus("🧠 Showing: Entire Project");
-            graphView?.Populate();
+            graphView?.Populate(isInitialLoad: false, triggerPulse: false);
+
             graphView.schedule.Execute(() => graphView.AnimateFrameAllNodes()).ExecuteLater(100);
         }
 

@@ -30,12 +30,27 @@ namespace ReaCS.Editor
         private Dictionary<Node, string> nodeToId = new();
         private Dictionary<string, List<string>> fieldToFieldGraph = new();
         private readonly Dictionary<Node, Color> originalNodeColors = new();
+        private Dictionary<string, string> fieldLastChangedBySO = new(); 
+        private Dictionary<string, Label> fieldValueLastSO = new(); 
+
+        private string focusedSOName = null;
+        private string currentFocusedSOName = null;
         private bool _isAnimatingView = false;
+
+        float CenteredStartY(float centerY, int count, float spacing) => centerY - (count * spacing) / 2f;
 
         private string currentFilter = "";
 
         public ReaCSGraphView()
         {
+            TryLoadStyleSheet("ReaCSGraphViewStyles");
+
+            ObservableRegistry.OnEditorFieldChanged += (soName, fieldName) =>
+            {
+                string fullFieldId = $"{soName}.{fieldName}";
+                MarkChanged(fullFieldId);
+            };
+
             SetupZoom(ContentZoomer.DefaultMinScale, ContentZoomer.DefaultMaxScale);
             this.AddManipulator(new ContentDragger());
             this.AddManipulator(new SelectionDragger());
@@ -69,8 +84,6 @@ namespace ReaCS.Editor
                 }
             });
 
-
-            // === Shortcut Help Banner ===
             var helpLabel = new Label("⤷ Shortcuts: [F] Frame     [R] Reset     [L] Lock     [P] Ping Selected")
             {
                 style = {
@@ -80,14 +93,11 @@ namespace ReaCS.Editor
                     position = Position.Relative
                 }
             };
-
             helpLabel.style.alignSelf = Align.Center;
             helpLabel.style.marginTop = 8;
             helpLabel.style.marginBottom = 4;
-
             Add(helpLabel);
 
-            // === Shortcut Help Banner ===
             var editorSystemWarningLabel = new Label("When in EditMode 'Systems' won't trigger their behaviour but you can still see every 'System' in the project reacting to an 'Observable' field that changed for debug purposes.\n" +
                 "When in PlayMode only the 'Systems' that are in the current opened scenes will be visible and they will react and trigger their behavior normally to an 'Observable' changing.")
             {
@@ -102,8 +112,31 @@ namespace ReaCS.Editor
             editorSystemWarningLabel.style.alignSelf = Align.Center;
             editorSystemWarningLabel.style.marginTop = 8;
             editorSystemWarningLabel.style.marginBottom = 4;
-
             Add(editorSystemWarningLabel);
+        }
+
+        private void TryLoadStyleSheet(string resourceName)
+        {
+            // Try loading from Resources (for dev/in-project context)
+            var styleSheet = Resources.Load<StyleSheet>(resourceName);
+            if (styleSheet != null)
+            {
+                styleSheets.Add(styleSheet);
+                return;
+            }
+
+            // Fallback for Package-based .uss
+#if UNITY_EDITOR
+            string packageRelativePath = "Packages/com.yourcompany.reacs/Editor/Styles/ReaCSGraphViewStyles.uss";
+            styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(packageRelativePath);
+            if (styleSheet != null)
+            {
+                styleSheets.Add(styleSheet);
+                return;
+            }
+#endif
+
+            Debug.LogWarning($"[ReaCS] Could not find style sheet '{resourceName}' in Resources or '{packageRelativePath}' in Package.");
         }
 
         public void Filter(string filter)
@@ -156,50 +189,40 @@ namespace ReaCS.Editor
             Populate(matchedIds);
         }
 
-        public void MarkChanged(string fieldId)
+
+
+        public void SetFocusedSO(string soName)
         {
-            ReaCSDebug.Log($"[GraphView] MarkChanged called for {fieldId}");
-
-            if (nodeMap.TryGetValue(fieldId, out var fieldNode))
-            {
-                changedTimestamps[fieldId] = (float)EditorApplication.timeSinceStartup;
-            }
-
-            schedule.Execute(UpdatePulse).Every(16);
-            UpdatePulse();
-
-            foreach (var edge in allFlowingEdges)
-            {
-                if (!nodeToId.TryGetValue(edge.output?.node, out var outputId)) continue;
-                if (!nodeToId.TryGetValue(edge.input?.node, out var inputId)) continue;
-
-                // ✅ Pulse edges coming *from* the changed field
-                if (outputId == fieldId)
-                {
-                    activePulseEdges[edge] = EditorApplication.timeSinceStartup;
-                    changedTimestamps[inputId] = (float)EditorApplication.timeSinceStartup;
-                }
-
-                // ✅ Pulse edges going *to* the changed field (e.g. SO ➝ field)
-                if (inputId == fieldId)
-                {
-                    activePulseEdges[edge] = EditorApplication.timeSinceStartup;
-                    changedTimestamps[outputId] = (float)EditorApplication.timeSinceStartup;
-                }
-            }
+            currentFocusedSOName = soName;
+            UpdateFieldLabels();
         }
+
+
 
 
         private void UpdatePulse()
         {
             double now = EditorApplication.timeSinceStartup;
+
+            AnimateEdgeTrails(now);
+            AnimateNodePulses(now);
+        }
+
+        private void AnimateEdgeTrails(double now)
+        {
             foreach (var kvp in activePulseEdges.ToList())
             {
                 var edge = kvp.Key;
                 double start = kvp.Value;
                 double elapsed = now - start;
 
-                // Only hide non-loop edges
+                if (edge == null)
+                {
+                    activePulseEdges.Remove(kvp.Key);
+                    continue;
+                }
+
+                // Stop showing pulse trail after 6 seconds
                 if (elapsed > 6.0 && !edge.IsLoopPulse)
                 {
                     edge.HideTrail();
@@ -213,11 +236,14 @@ namespace ReaCS.Editor
                     edge.UpdateTrail(t);
                 }
             }
+        }
 
-            double timeNow = EditorApplication.timeSinceStartup;
+        private void AnimateNodePulses(double now)
+        {
             foreach (var id in changedTimestamps.Keys.ToList())
             {
-                float elapsed = (float)(timeNow - changedTimestamps[id]);
+                float elapsed = (float)(now - changedTimestamps[id]);
+
                 if (nodeMap.TryGetValue(id, out var node))
                 {
                     if (elapsed > 4f)
@@ -226,6 +252,7 @@ namespace ReaCS.Editor
                             SetNodeColor(node, baseColor);
                         else
                             SetNodeColor(node, Color.clear);
+
                         changedTimestamps.Remove(id);
                     }
                     else
@@ -235,11 +262,20 @@ namespace ReaCS.Editor
                     }
                 }
             }
-            UpdateFieldLabels();
-
         }
 
-        public void Populate()
+
+        public void Populate(bool isInitialLoad = false, bool triggerPulse = false)
+        {
+            PopulateInternal(null, isInitialLoad, triggerPulse);
+        }
+
+        public void Populate(HashSet<string> visibleNodes, bool triggerPulse = false)
+        {
+            PopulateInternal(visibleNodes, false, triggerPulse);
+        }
+
+        private void PopulateInternal(HashSet<string> visibleNodes, bool isInitialLoad, bool triggerPulse)
         {
             originalNodeColors.Clear();
             var previousActiveEdges = new Dictionary<FlowingEdge, double>(activePulseEdges);
@@ -253,49 +289,51 @@ namespace ReaCS.Editor
             fieldToSO.Clear();
             systemToSO.Clear();
 
-            InternalPopulate();
+            if (visibleNodes != null)
+                CorePopulate(visibleNodes);
+            else
+                CorePopulate();
 
-            foreach (var pair in previousChanged)
-                if (nodeMap.ContainsKey(pair.Key)) changedTimestamps[pair.Key] = pair.Value;
-
-            foreach (var pair in previousActiveEdges)
+            foreach (var kvp in fieldToSO.ToList())
             {
-                var oldEdge = pair.Key;
-                string fromTitle = oldEdge.output?.node?.title;
-                string toTitle = oldEdge.input?.node?.title;
+                string fieldId = kvp.Key;
+                string soName = kvp.Value;
+                string fieldName = fieldId.Split('.').Last();
 
-                var newEdge = allFlowingEdges.FirstOrDefault(e =>
-                    e.output?.node?.title == fromTitle &&
-                    e.input?.node?.title == toTitle);
+                var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                                     .FirstOrDefault(s => s.name == soName);
+                if (soObj == null) continue;
 
-                if (newEdge != null)
-                    activePulseEdges[newEdge] = pair.Value;
+                string groupedFieldId = $"group:{soObj.GetType().Name}.{fieldName}";
+
+                if (!fieldLastChangedBySO.ContainsKey(fieldId))
+                    fieldLastChangedBySO[fieldId] = soName;
+
+                if (!fieldLastChangedBySO.ContainsKey(groupedFieldId))
+                    fieldLastChangedBySO[groupedFieldId] = soName;
+
+                lastFieldValues[fieldId] = TryGetFieldValue(soObj, fieldName);
+                lastFieldValues[groupedFieldId] = TryGetFieldValue(soObj, fieldName);
+
+                if (triggerPulse)
+                {
+                    MarkChanged(fieldId);
+                }
             }
+
+            RestorePreviousPulseState(previousChanged, previousActiveEdges);
 
             schedule.Execute(UpdatePulse).Every(16);
             UpdateFieldLabels();
             schedule.Execute(() => AnimateFrameAllNodes()).ExecuteLater(100);
         }
 
-        public void Populate(HashSet<string> visibleNodes)
+        private void RestorePreviousPulseState(Dictionary<string, float> previousChanged, Dictionary<FlowingEdge, double> previousEdges)
         {
-            var previousActiveEdges = new Dictionary<FlowingEdge, double>(activePulseEdges);
-            var previousChanged = new Dictionary<string, float>(changedTimestamps);
-
-            graphElements.ToList().ForEach(RemoveElement);
-            nodeMap.Clear();
-            changedTimestamps.Clear();
-            activePulseEdges.Clear();
-            allFlowingEdges.Clear();
-            fieldToSO.Clear();
-            systemToSO.Clear();
-
-            InternalPopulate(visibleNodes);
-
             foreach (var pair in previousChanged)
                 if (nodeMap.ContainsKey(pair.Key)) changedTimestamps[pair.Key] = pair.Value;
 
-            foreach (var pair in previousActiveEdges)
+            foreach (var pair in previousEdges)
             {
                 var oldEdge = pair.Key;
                 string fromTitle = oldEdge.output?.node?.title;
@@ -308,13 +346,145 @@ namespace ReaCS.Editor
                 if (newEdge != null)
                     activePulseEdges[newEdge] = pair.Value;
             }
-
-            schedule.Execute(UpdatePulse).Every(16);
-            UpdateFieldLabels();
-            schedule.Execute(() => AnimateFrameAllNodes()).ExecuteLater(100);
         }
 
-        private void InternalPopulate(HashSet<string> filter = null)
+        public void MarkChanged(string fieldId)
+        {
+            ReaCSDebug.Log($"[GraphView] MarkChanged called for {fieldId}");
+
+            string soName = currentFocusedSOName;
+            if (string.IsNullOrEmpty(soName))
+            {
+                if (fieldToSO.TryGetValue(fieldId, out var mappedSO))
+                    soName = mappedSO;
+                else if (fieldId.Contains("."))
+                    soName = fieldId.Split('.').First();
+            }
+
+            if (string.IsNullOrEmpty(soName))
+                return;
+
+            string fieldName = fieldId.Split('.').Last();
+            string groupedFieldId = $"group:{GetSOType(soName)}.{fieldName}";
+
+            // Update last changer metadata// Update SO ownership and last changer metadata
+            fieldToSO[fieldId] = soName;
+            fieldToSO[groupedFieldId] = soName;
+
+            fieldLastChangedBySO[fieldId] = soName;
+            fieldLastChangedBySO[groupedFieldId] = soName;
+
+            var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                                 .FirstOrDefault(s => s.name == soName);
+            if (soObj != null)
+            {
+                lastFieldValues[fieldId] = TryGetFieldValue(soObj, fieldName);
+                lastFieldValues[groupedFieldId] = TryGetFieldValue(soObj, fieldName);
+            }
+
+            // Pulse all edges/nodes starting from both field IDs (solo and group)
+            PulseConnectedEdges(fieldId);
+            PulseConnectedEdges(groupedFieldId);
+
+            UpdatePulse();
+            UpdateFieldLabels();
+        }
+
+
+
+        private void PulseConnectedEdges(string primaryFieldId)
+        {
+            double now = EditorApplication.timeSinceStartup;
+
+            if (!fieldToSO.TryGetValue(primaryFieldId, out var soName))
+                return;
+
+            string fieldName = primaryFieldId.Split('.').Last();
+            string groupType = GetSOType(soName);
+            string groupFieldId = $"group:{groupType}.{fieldName}";
+            string proxyId = $"group:{groupType}:proxy";
+
+            // Determine the correct fieldId to pulse
+            string fieldIdToUse = nodeMap.ContainsKey(primaryFieldId) ? primaryFieldId :
+                                  nodeMap.ContainsKey(groupFieldId) ? groupFieldId : null;
+
+            if (string.IsNullOrEmpty(fieldIdToUse)) return;
+
+            // Start from SO node, not proxy
+            if (!nodeMap.TryGetValue(soName, out var startNode))
+                return;
+
+            var visited = new HashSet<Node>();
+            var toVisit = new Queue<Node>();
+            toVisit.Enqueue(startNode);
+
+            while (toVisit.Count > 0)
+            {
+                var current = toVisit.Dequeue();
+                if (!visited.Add(current)) continue;
+
+                string currentId = nodeToId.GetValueOrDefault(current);
+                if (!string.IsNullOrEmpty(currentId))
+                    changedTimestamps[currentId] = (float)now;
+
+                foreach (var edge in allFlowingEdges)
+                {
+                    bool isFrom = edge.output?.node == current;
+                    if (!isFrom) continue;
+
+                    var next = edge.input?.node;
+                    if (next == null || visited.Contains(next)) continue;
+
+                    string fromId = nodeToId.GetValueOrDefault(current);
+                    string toId = nodeToId.GetValueOrDefault(next);
+
+                    // ✅ Block unrelated fanout at SO node
+                    if (fromId == soName && toId != proxyId && toId != primaryFieldId)
+                        continue;
+
+                    // ✅ Block unrelated fanout at proxy node
+                    if (fromId == proxyId && toId != groupFieldId)
+                        continue;
+
+                    // ✅ Block invalid fanout from field
+                    if ((fromId == groupFieldId || fromId == primaryFieldId) &&
+                        !(toId?.Contains("System") == true || toId?.Contains("sysProxy") == true))
+                        continue;
+
+                    activePulseEdges[edge] = now;
+                    toVisit.Enqueue(next);
+                }
+            }
+        }
+
+
+
+
+
+
+
+        private string GetSOType(string soName)
+        {
+            var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                              .FirstOrDefault(s => s.name == soName);
+            return so?.GetType().Name ?? "UnknownSOType";
+        }
+
+        private object TryGetFieldValue(ObservableScriptableObject so, string fieldName)
+        {
+            var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (field == null) return null;
+
+            var observable = field.GetValue(so);
+            if (observable == null) return null;
+
+            var valueProp = observable.GetType().GetProperty("Value");
+            return valueProp?.GetValue(observable);
+        }
+
+
+
+        private void CorePopulate(HashSet<string> filter = null)
         {
             var allSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
             var allSystemTypes = AppDomain.CurrentDomain.GetAssemblies()
@@ -322,132 +492,371 @@ namespace ReaCS.Editor
                 .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
                 .ToList();
 
-            float xSO = 0f, xField = 300f, xSystem = 800f;
-            float y = 0f, verticalSpacing = 160f;
-
-            foreach (var so in allSOs)
+            /*// ✅ Filter SOs by name or field before grouping
+            if (filter != null)
             {
-                string soId = so.name;
-                if (filter != null && !filter.Contains(soId)) continue;
+                allSOs = allSOs.Where(so =>
+                    filter.Contains(so.name) ||
+                    GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
+                    .ToArray();
+            }*/
+            // Do NOT filter out SOs globally – we need all types to find the systems that match
 
-                var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xSO, y), so.name);
-                nodeMap[soId] = soNode;
-                AddElement(soNode);
+            var groupedByType = allSOs
+                .GroupBy(so => so.GetType())
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-                var fields = so.GetType()
-                    .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                    .Where(f =>
-                        Attribute.IsDefined(f, typeof(ObservableAttribute)) ||
-                        Attribute.IsDefined(f, typeof(ObservableSavedAttribute)));
+            float xGroup = 0f;
+            float xProxy = xGroup + 420f;
+            float xField = xProxy + 300f;
+            float xSystem = xField + 400f;
+            float xSystemGroup = xSystem + 260f;
+            float y = 0f;
+            float verticalSpacing = 140f;
 
-                int fieldIndex = 0;
-                foreach (var field in fields)
+            if (filter != null)
+            {
+                var allowedTypes = new HashSet<Type>(
+                    Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                        .Where(so =>
+                            filter.Contains(so.name) ||
+                            GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
+                        .Select(so => so.GetType())
+                );
+
+                groupedByType = groupedByType
+                    .Where(kvp => allowedTypes.Contains(kvp.Key))
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
+
+            foreach (var kvp in groupedByType)
+            {
+                var soType = kvp.Key;
+                var allTypeSOs = kvp.Value;
+
+                var matchingSOs = allTypeSOs
+                    .Where(so =>
+                        filter == null ||
+                        filter.Contains(so.name) ||
+                        GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
+                    .ToList();
+
+                if (allTypeSOs.Count == 1)
                 {
-                    string fieldName = field.Name;
-                    string fieldId = $"{so.name}.{fieldName}";
-                    if (filter != null && !filter.Contains(fieldId)) continue;
+                    var so = allTypeSOs[0];
+                    var fieldInfos = GetObservedFields(so);
+                    string soId = so.name;
 
-                    float fieldY = y + fieldIndex * verticalSpacing;
-                                        
+                    int fieldCount = fieldInfos.Count;
+                    float singleSoFieldBlockHeight = fieldCount * verticalSpacing;
+                    float centerY = y + singleSoFieldBlockHeight / 2f;
 
-                    var fieldNode = CreateNode($"🔸 {fieldName}", NodeType.Field, new Vector2(xField, fieldY), $"{so.name}.{fieldName}");
-                                        
-                    nodeMap[fieldId] = fieldNode;
-                    AddElement(fieldNode);
-                    fieldToSO[fieldId] = soId;
+                    var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xGroup, centerY - verticalSpacing / 2f), soId);
+                    nodeMap[soId] = soNode;
+                    AddElement(soNode);
 
-                    Connect(soNode.outputContainer[0] as Port, fieldNode.inputContainer[0] as Port);
+                    float singleFieldStartY = centerY - (singleSoFieldBlockHeight / 2f);
 
-                    fieldNode.RegisterCallback<MouseDownEvent>(evt =>
+                    for (int i = 0; i < fieldCount; i++)
                     {
-                        if (evt.button == 1) MarkChanged(fieldId);
-                    });
+                        var field = fieldInfos[i];
+                        string fieldId = $"{so.name}.{field.Name}";
+                        if (filter != null && !filter.Contains(fieldId)) continue;
 
-                    int systemIndex = 0;
-                    ReaCSDebug.Log($"[ReaCS] Found {allSystemTypes.Count} system types.");
-                    foreach (var sysType in allSystemTypes)
-                    {
-                        ReaCSDebug.Log($"[ReaCS] System: {sysType.FullName}");
-                        var attrs = sysType.GetCustomAttributes(typeof(ReactToAttribute), true);
-                        foreach (var attr in attrs.Cast<ReactToAttribute>())
-                        {
-                            ReaCSDebug.Log($" └ Reacts to: {attr.FieldName}");
-                            if (attr.FieldName != fieldName)
-                            {
-                                ReaCSDebug.Log($"   ❌ Skipped (doesn't match field: {fieldName})");
-                                continue;
-                            }
+                        float fieldY = singleFieldStartY + i * verticalSpacing;
+                        var fieldNode = CreateNode($"🔸 {field.Name}", NodeType.Field, new Vector2(xField, fieldY), fieldId);
+                        nodeMap[fieldId] = fieldNode;
+                        AddElement(fieldNode);
+                        fieldToSO[fieldId] = so.name;
 
-                            var baseType = sysType.BaseType;
-                            if (baseType is { IsGenericType: true })
-                            {
-                                var soType = baseType.GetGenericArguments()[0];
-                                ReaCSDebug.Log($"   ➤ Checks if {soType.Name} is assignable from {so.GetType().Name}");
-
-                                if (!soType.IsAssignableFrom(so.GetType()))
-                                {
-                                    ReaCSDebug.Log($"   ❌ Skipped (type mismatch)");
-                                    continue;
-                                }
-
-                                string sysId = sysType.Name;
-
-                                // ✅ Skip this system if we're in playmode and it has no live instances
-                                if (Application.isPlaying)
-                                {
-                                    var liveInstances = GameObject.FindObjectsByType(sysType, FindObjectsSortMode.InstanceID);
-                                    if (liveInstances == null || liveInstances.Length == 0)
-                                    {
-                                        ReaCSDebug.Log($"   ⏸ Skipped {sysType.Name} — not in scene (Play Mode).");
-                                        continue;
-                                    }
-                                }
-
-                                ReaCSDebug.Log($"   ✅ Matched — will create system node!");
-
-                                if (filter != null && !filter.Contains(sysId)) continue;
-
-                                if (!nodeMap.TryGetValue(sysId, out var sysNode))
-                                {
-                                    float systemY = y + systemIndex * verticalSpacing;
-                                    sysNode = CreateNode($"▶ {sysType.Name}", NodeType.System, new Vector2(xSystem, systemY), sysType.FullName);
-                                    systemIndex++;
-                                    nodeMap[sysId] = sysNode;
-                                    AddElement(sysNode);
-                                    systemToSO[sysId] = soId;
-                                }
-
-                                Connect(fieldNode.outputContainer[0] as Port, sysNode.inputContainer[0] as Port);
-                            }
-                        }
-
-                        string sourceFieldId = $"{so.name}.{fieldName}";
-
-                        foreach (var otherField in so.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
-                        {
-                            if (!Attribute.IsDefined(otherField, typeof(ObservableAttribute)) &&
-                                !Attribute.IsDefined(otherField, typeof(ObservableSavedAttribute))) continue;
-
-                            string targetFieldId = $"{so.name}.{otherField.Name}";
-                            if (targetFieldId == sourceFieldId) continue;
-
-                            if (!fieldToFieldGraph.TryGetValue(sourceFieldId, out var list))
-                            {
-                                list = new List<string>();
-                                fieldToFieldGraph[sourceFieldId] = list;
-                            }
-
-                            list.Add(targetFieldId);
-                        }
+                        Connect(soNode.outputContainer[0] as Port, fieldNode.inputContainer[0] as Port);
                     }
 
-                    fieldIndex++;
+                    y += Mathf.Max(fieldInfos.Count, 1) * verticalSpacing + 100;
+                    continue;
                 }
 
-                // Final Y adjustment per SO
-                y += Math.Max(fields.Count(), 1) * verticalSpacing;
+                var fieldNames = allTypeSOs
+                    .SelectMany(so => GetObservedFields(so))
+                    .Select(f => f.Name)
+                    .Distinct()
+                    .OrderBy(n => n)
+                    .ToList();
+
+                string groupTypeName = soType.Name;
+                string groupKey = $"group:{groupTypeName}";
+                string proxyId = $"{groupKey}:proxy";
+
+                float groupHeight = allTypeSOs.Count * verticalSpacing;
+                float fieldBlockHeight = fieldNames.Count * verticalSpacing;
+                float maxHeight = Mathf.Max(groupHeight, fieldBlockHeight);
+
+                float fieldStartY = y + (maxHeight - fieldBlockHeight) / 2f;
+                float proxyY = y + (maxHeight - verticalSpacing) / 2f;
+
+                var proxyNode = CreateNode($"📦 {groupTypeName} (Group)", NodeType.SO, new Vector2(xProxy, proxyY), proxyId);
+                nodeMap[proxyId] = proxyNode;
+                AddElement(proxyNode);
+
+                var groupBox = new Group();
+                groupBox.SetPosition(new Rect(xGroup - 100f, y, 260, groupHeight + 40));
+
+                var titleLabel = new Label($"🧩 {groupTypeName} ({allTypeSOs.Count})");
+                titleLabel.AddToClassList("reaCS-group-title");
+                groupBox.Insert(0, titleLabel);
+
+                groupBox.AddToClassList("reaCS-group-box");
+
+                AddElement(groupBox);
+
+                // ✅ Skip entire group if none match
+                if (matchingSOs.Count == 0)
+                    continue;
+
+                float localY = y;
+                foreach (var so in matchingSOs)
+                {
+                    Debug.Log($"[ReaCS] Processing group: {soType} with {allTypeSOs.Count} SOs");
+
+                    var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xGroup + 20, localY), so.name);
+                    nodeMap[so.name] = soNode;
+                    AddElement(soNode);
+                    groupBox.AddElement(soNode);
+
+                    var traceEdge = Connect(soNode.outputContainer[0] as Port, proxyNode.inputContainer[0] as Port);
+                    traceEdge.pickingMode = PickingMode.Ignore;
+                    traceEdge.style.opacity = 0.3f;
+                    traceEdge.style.borderBottomWidth = 0.5f;
+
+                    localY += verticalSpacing;
+                }
+
+                var systemsPerField = new Dictionary<FieldReactionKey, List<Type>>();
+                foreach (var sysType in allSystemTypes)
+                {
+                    var attr = sysType.GetCustomAttribute<ReactToAttribute>();
+                    if (attr == null) continue;
+
+                    var baseSOType = sysType.BaseType?.GetGenericArguments()[0];
+                    if (baseSOType == null) continue;
+
+                    var key = new FieldReactionKey(attr.FieldName, baseSOType);
+
+                    if (!systemsPerField.TryGetValue(key, out var fieldList))
+                        systemsPerField[key] = fieldList = new List<Type>();
+
+                    fieldList.Add(sysType);
+                }
+
+                for (int i = 0; i < fieldNames.Count; i++)
+                {
+                    string fieldName = fieldNames[i];
+                    string fieldId = $"{groupKey}.{fieldName}";
+                    if (filter != null && !filter.Contains(fieldId)) continue;
+
+                    // ✅ Build typed key
+                    var key = new FieldReactionKey(fieldName, soType);
+
+                    // ✅ Lookup matching systems only for this field+type combo
+                    if (!systemsPerField.TryGetValue(key, out var fieldSystems))
+                        fieldSystems = new List<Type>();
+
+                    bool hasGroup = fieldSystems.Count > 1;
+                    bool hasSingleSystem = fieldSystems.Count == 1;
+
+                    float groupSysHeight = hasGroup ? fieldSystems.Count * verticalSpacing + 40f : 0f;
+                    float singleHeight = hasSingleSystem ? verticalSpacing : 0f;
+                    float fieldHeight = verticalSpacing;
+
+                    float blockHeight = Mathf.Max(groupSysHeight, singleHeight, fieldHeight);
+                    float blockPadding = 80f;
+                    float totalBlockHeight = blockHeight + blockPadding;
+
+                    float blockCenterY = fieldStartY + totalBlockHeight / 2f;
+
+                    var fieldNode = CreateNode($"🔸 {fieldName}", NodeType.Field, new Vector2(xField, blockCenterY), fieldId);
+                    nodeMap[fieldId] = fieldNode;
+                    AddElement(fieldNode);
+
+                    // We’ll use this at runtime to track the latest SO per field
+                    if (!fieldToSO.ContainsKey(fieldId))
+                        fieldToSO[fieldId] = $"<group:{groupTypeName}>"; // placeholder only
+
+                    // 🟡 Add dynamic field-to-focused-SO map if in focus mode
+                    if (!string.IsNullOrEmpty(currentFocusedSOName))
+                    {
+                        string focusedFieldId = $"{currentFocusedSOName}.{fieldName}";
+                        if (!fieldToSO.ContainsKey(focusedFieldId))
+                            fieldToSO[focusedFieldId] = currentFocusedSOName;
+                    }
+
+                    Connect(proxyNode.outputContainer[0] as Port, fieldNode.inputContainer[0] as Port);
+
+                    // ✅ Single system
+                    if (fieldSystems.Count == 1)
+                    {
+                        var sysType = fieldSystems[0];
+                        string sysId = sysType.Name;
+
+                        if (!nodeMap.TryGetValue(sysId, out var sysNode))
+                        {
+                            var systemNode = CreateNode($"🧪 {sysType.Name}", NodeType.System, new Vector2(xSystemGroup, blockCenterY), sysType.FullName);
+                            nodeMap[sysId] = systemNode;
+                            AddElement(systemNode);
+                            systemToSO[sysId] = allTypeSOs[0].name;
+                        }
+
+                        Connect(fieldNode.outputContainer[0] as Port, nodeMap[sysId].inputContainer[0] as Port);
+                    }
+                    else if (fieldSystems.Count > 1)
+                    {
+                        string sysGroupId = $"{groupKey}.{fieldName}.sysProxy";
+
+                        var proxySystemNode = CreateNode($"📦 Systems ({fieldName})", NodeType.System, new Vector2(xSystem, blockCenterY), sysGroupId);
+                        nodeMap[sysGroupId] = proxySystemNode;
+                        AddElement(proxySystemNode);
+                        Connect(fieldNode.outputContainer[0] as Port, proxySystemNode.inputContainer[0] as Port);
+
+                        var sysGroupBox = new Group();
+                        sysGroupBox.SetPosition(new Rect(xSystemGroup, blockCenterY - groupSysHeight / 2f, 260, groupSysHeight + 40));
+
+                        var label = new Label($"🧪 {fieldName} Systems ({fieldSystems.Count})");
+                        label.AddToClassList("reaCS-group-title");
+                        sysGroupBox.Insert(0, label);
+                        sysGroupBox.AddToClassList("reaCS-group-box");
+                        AddElement(sysGroupBox);
+
+                        float sysLocalY = blockCenterY - (fieldSystems.Count * verticalSpacing) / 2f;
+
+                        foreach (var sysType in fieldSystems)
+                        {
+                            string sysId = sysType.Name;
+
+                            if (!nodeMap.TryGetValue(sysId, out var sysNode))
+                            {
+                                sysNode = CreateNode($"🧪 {sysType.Name}", NodeType.System, new Vector2(xSystemGroup + 20, sysLocalY), sysType.FullName);
+                                nodeMap[sysId] = sysNode;
+                                AddElement(sysNode);
+                                systemToSO[sysId] = allTypeSOs[0].name;
+                            }
+
+                            sysGroupBox.AddElement(sysNode);
+                            var traceEdge = Connect(proxySystemNode.outputContainer[0] as Port, sysNode.inputContainer[0] as Port);
+                            traceEdge.pickingMode = PickingMode.Ignore;
+                            traceEdge.style.opacity = 0.3f;
+
+                            sysLocalY += verticalSpacing;
+                        }
+
+                        CenterSystemGroupToProxy(sysGroupId);
+                    }
+
+                    fieldStartY += totalBlockHeight;
+                }
+
+                CenterSOGroupToProxy(proxyId, groupKey, groupBox, allTypeSOs);
+
+
+
+                y += maxHeight + 140;
             }
+
             UpdateFieldLabels();
+        }
+
+        private void CenterSOGroupToProxy(string proxyId, string groupKey, Group groupBox, List<ObservableScriptableObject> allTypeSOs)
+        {
+            schedule.Execute(() =>
+            {
+                schedule.Execute(() =>
+                {
+                    if (!nodeMap.TryGetValue(proxyId, out var proxyNode)) return;
+
+                    // Step 1: Recenter proxy to average Y of connected fields
+                    var connectedFieldYs = nodeMap
+                        .Where(kvp => kvp.Key.StartsWith($"{groupKey}.") && kvp.Value != null)
+                        .Where(kvp => allFlowingEdges.Any(edge =>
+                            edge.output?.node == proxyNode && edge.input?.node == kvp.Value))
+                        .Select(kvp => kvp.Value.GetPosition().center.y)
+                        .ToList();
+
+                    if (connectedFieldYs.Count > 0)
+                    {
+                        float avgY = connectedFieldYs.Average();
+                        var proxyPos = proxyNode.GetPosition();
+                        proxyNode.SetPosition(new Rect(new Vector2(proxyPos.x, avgY - proxyPos.height / 2f), proxyPos.size));
+                    }
+
+                    // Step 2: Delay again to get updated proxy position, shift SO nodes to match
+                    schedule.Execute(() =>
+                    {
+                        var proxyY = proxyNode.GetPosition().center.y;
+
+                        var soNodes = allTypeSOs
+                            .Where(so => nodeMap.ContainsKey(so.name))
+                            .Select(so => nodeMap[so.name])
+                            .ToList();
+
+                        if (soNodes.Count > 0)
+                        {
+                            float groupCenterY = soNodes.Select(n => n.GetPosition().center.y).Average();
+                            float deltaY = proxyY - groupCenterY;
+
+                            foreach (var soNode in soNodes)
+                            {
+                                var rect = soNode.GetPosition();
+                                soNode.SetPosition(new Rect(new Vector2(rect.x, rect.y + deltaY), rect.size));
+                            }
+                        }
+                    }).ExecuteLater(20);
+
+                }).ExecuteLater(20);
+            }).ExecuteLater(10);
+        }
+
+        private void CenterSystemGroupToProxy(string proxySystemId)
+        {
+            schedule.Execute(() =>
+            {
+                schedule.Execute(() =>
+                {
+                    if (!nodeMap.TryGetValue(proxySystemId, out var proxyNode)) return;
+
+                    // Step 1: Recenter system group contents based on updated proxy Y
+                    schedule.Execute(() =>
+                    {
+                        float proxyY = proxyNode.GetPosition().center.y;
+
+                        // Find all systems connected from this proxy
+                        var systemNodes = allFlowingEdges
+                            .Where(edge => edge.output?.node == proxyNode)
+                            .Select(edge => edge.input?.node)
+                            .Where(n => n != null && nodeMap.ContainsValue(n))
+                            .ToList();
+
+                        if (systemNodes.Count == 0) return;
+
+                        float groupCenterY = systemNodes.Select(n => n.GetPosition().center.y).Average();
+                        float deltaY = proxyY - groupCenterY;
+
+                        foreach (var sysNode in systemNodes)
+                        {
+                            var rect = sysNode.GetPosition();
+                            sysNode.SetPosition(new Rect(new Vector2(rect.x, rect.y + deltaY), rect.size));
+                        }
+
+                    }).ExecuteLater(20);
+
+                }).ExecuteLater(20);
+            }).ExecuteLater(10);
+        }
+
+        private List<FieldInfo> GetObservedFields(ObservableScriptableObject so)
+        {
+            return so.GetType()
+                .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(f => Attribute.IsDefined(f, typeof(ObservableAttribute)) || Attribute.IsDefined(f, typeof(ObservableSavedAttribute)))
+                .ToList();
         }
 
         private void SetNodeColor(Node node, Color color)
@@ -461,6 +870,7 @@ namespace ReaCS.Editor
                 originalNodeColors[node] = color;
         }
 
+        // Updated to avoid false 'null' in grouped fields
         private Node CreateNode(string title, NodeType type, Vector2 position, string nodeId)
         {
             var node = new Node();
@@ -475,8 +885,9 @@ namespace ReaCS.Editor
 
             node.userData = type;
 
-            // Default title, may override for fields
             string displayTitle = title;
+            string soName = null;
+            string fieldName = null;
 
             if (type == NodeType.SO)
             {
@@ -489,12 +900,18 @@ namespace ReaCS.Editor
             else if (type == NodeType.Field)
             {
                 SetNodeColor(node, new Color(0.17f, 0.17f, 0.17f));
-                var split = nodeId.Split('.');
-                if (split.Length == 2)
-                {
-                    string soName = split[0];
-                    string fieldName = split[1];
 
+                var split = nodeId.Split('.');
+                if (split.Length >= 2)
+                {
+                    // Support for group:Type.fieldName or normal SO.fieldName
+                    fieldName = split[^1];
+                    if (fieldToSO.TryGetValue(nodeId, out var resolvedSO))
+                        soName = resolvedSO;
+                }
+
+                if (!string.IsNullOrEmpty(soName) && !string.IsNullOrEmpty(fieldName))
+                {
                     var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
                         .FirstOrDefault(s => s.name == soName);
 
@@ -507,7 +924,6 @@ namespace ReaCS.Editor
                             if (observable != null)
                             {
                                 var persistFlag = field.FieldType.GetField("ShouldPersist", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
                                 if (persistFlag != null && persistFlag.FieldType == typeof(bool))
                                 {
                                     bool shouldPersist = (bool)persistFlag.GetValue(observable);
@@ -526,45 +942,34 @@ namespace ReaCS.Editor
                 var fieldInfoContainer = new VisualElement
                 {
                     style = {
-                flexDirection = FlexDirection.Column,
-                marginTop = 4,
-                marginBottom = 4,
-                paddingLeft = 6,
-                paddingRight = 6
-            }
+                        flexDirection = FlexDirection.Column,
+                        marginTop = 4,
+                        marginBottom = 4,
+                        paddingLeft = 6,
+                        paddingRight = 6
+                    }
                 };
 
                 var valueRow = new VisualElement { style = { flexDirection = FlexDirection.Row, alignItems = Align.Center } };
-
-                var icon = new Label(""); // ✅ / ❌ / ⚠️
-                icon.style.marginRight = 4;
-                icon.style.fontSize = 14;
-
-                var valueLabel = new Label("null");
-                valueLabel.style.fontSize = 12;
-                valueLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+                var icon = new Label("") { style = { marginRight = 4, fontSize = 14 } };
+                var valueLabel = new Label("null") { style = { fontSize = 12, unityFontStyleAndWeight = FontStyle.Bold } };
 
                 valueRow.Add(icon);
                 valueRow.Add(valueLabel);
 
                 var typeRow = new Label
-                {
-                    style = {
-                fontSize = 9,
-                color = Color.gray,
-                marginTop = 2
-            }
+                    {
+                        style = {
+                        fontSize = 9,
+                        color = Color.gray,
+                        marginTop = 2
+                    }
                 };
 
-                var split = nodeId.Split('.');
-                if (split.Length == 2)
+                if (!string.IsNullOrEmpty(fieldName) && !string.IsNullOrEmpty(soName))
                 {
-                    string soName = split[0];
-                    string fieldName = split[1];
-
                     var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
                         .FirstOrDefault(s => s.name == soName);
-
                     if (so != null)
                     {
                         var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -573,7 +978,6 @@ namespace ReaCS.Editor
                             string fType = field.FieldType.IsGenericType
                                 ? $"Observable<{field.FieldType.GetGenericArguments()[0].Name}>"
                                 : field.FieldType.Name;
-
                             typeRow.text = $"[{fType}]";
                         }
                     }
@@ -582,6 +986,18 @@ namespace ReaCS.Editor
                 fieldInfoContainer.Add(typeRow);
                 fieldInfoContainer.Add(CreateDottedDivider());
                 fieldInfoContainer.Add(valueRow);
+
+                var lastSONameLabel = new Label("")
+                {
+                    style = {
+                fontSize = 9,
+                color = Color.gray,
+                marginTop = 2,
+                unityTextAlign = TextAnchor.MiddleRight
+            }
+                };
+                fieldInfoContainer.Add(lastSONameLabel);
+                fieldValueLastSO[nodeId] = lastSONameLabel;
 
                 node.extensionContainer.Add(fieldInfoContainer);
                 node.RefreshExpandedState();
@@ -599,9 +1015,35 @@ namespace ReaCS.Editor
             node.SetPosition(new Rect(position, defaultNodeSize));
 
             nodeToId[node] = nodeId;
-
             return node;
         }
+
+        private string ResolveLastChangedSO(string fieldId)
+        {
+            if (fieldLastChangedBySO.TryGetValue(fieldId, out var so)) return so;
+
+            // If grouped field, resolve from known last-changed SO for specific instances
+            if (fieldId.StartsWith("group:") && fieldId.Contains("."))
+            {
+                string typeName = fieldId.Split(':')[1].Split('.')[0];
+                string fieldName = fieldId.Split('.').Last();
+
+                var candidates = fieldLastChangedBySO
+                    .Where(kvp => kvp.Key.EndsWith($".{fieldName}"))
+                    .Where(kvp =>
+                    {
+                        var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                                             .FirstOrDefault(s => s.name == kvp.Value);
+                        return soObj != null && soObj.GetType().Name == typeName;
+                    });
+
+                var latest = candidates.OrderByDescending(kvp => EditorApplication.timeSinceStartup).FirstOrDefault();
+                return latest.Value;
+            }
+
+            return null;
+        }
+
 
         private void UpdateFieldLabels()
         {
@@ -610,14 +1052,32 @@ namespace ReaCS.Editor
                 string fieldId = kvp.Key;
                 Label label = kvp.Value;
 
-                var split = fieldId.Split('.');
-                if (split.Length != 2) continue;
+                string fieldName = fieldId.Split('.').Last();
+                string resolvedFieldId = fieldId;
+                string soName = null;
 
-                string soName = split[0];
-                string fieldName = split[1];
+                if (!string.IsNullOrEmpty(currentFocusedSOName))
+                {
+                    // 🟡 Focus mode: use focused SO and re-map fieldId if it's a grouped node
+                    soName = currentFocusedSOName;
+
+                    if (fieldId.StartsWith("group:"))
+                    {
+                        // Convert from group:Type.fieldName → soName.fieldName
+                        resolvedFieldId = $"{soName}.{fieldName}";
+                    }
+                }
+                else
+                {
+                    // 🔵 Project mode: use last-changed SO
+                    soName = ResolveLastChangedSO(fieldId);
+                }
+
+                if (string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(soName))
+                    continue;
 
                 var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
-                    .FirstOrDefault(s => s.name == soName);
+                                  .FirstOrDefault(s => s.name == soName);
                 if (so == null) continue;
 
                 var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -632,10 +1092,17 @@ namespace ReaCS.Editor
                 var value = valueProp.GetValue(observable);
                 var valueStr = value?.ToString() ?? "null";
 
+                // 🔁 Force refresh internal tracking so grouped fields show focused SO value
+                lastFieldValues[resolvedFieldId] = value;
+                fieldLastChangedBySO[resolvedFieldId] = soName;
+                fieldLastChangedBySO[fieldId] = soName; // ensure both group and raw are synced
+                ReaCSDebug.Log($"[UpdateFieldLabels] {fieldId} (resolved: {resolvedFieldId}) → Value from SO: {soName} = {valueStr}");
+
                 label.text = valueStr;
 
-                // Emoji logic
-                if (fieldValueIcons.TryGetValue(fieldId, out var iconElem))
+                // 🟢 Update icon
+                if (fieldValueIcons.TryGetValue(fieldId, out var iconElem) ||
+                    fieldValueIcons.TryGetValue(resolvedFieldId, out iconElem))
                 {
                     if (value == null)
                     {
@@ -654,8 +1121,25 @@ namespace ReaCS.Editor
                         iconElem.visible = false;
                     }
                 }
+
+                // 🟣 Update SO label
+                if (fieldValueLastSO.TryGetValue(fieldId, out var lastLabel) ||
+                    fieldValueLastSO.TryGetValue(resolvedFieldId, out lastLabel))
+                {
+                    if (!string.IsNullOrEmpty(currentFocusedSOName))
+                        lastLabel.text = $"Focused: {currentFocusedSOName}";
+                    else if (fieldLastChangedBySO.TryGetValue(fieldId, out var lastSo))
+                        lastLabel.text = $"Last: {lastSo}";
+                    else
+                        lastLabel.text = "";
+
+                    lastLabel.style.display = DisplayStyle.Flex;
+                }
             }
         }
+
+
+
         private Texture2D MakeDottedLineTexture()
         {
             var tex = new Texture2D(4, 1);
@@ -672,18 +1156,24 @@ namespace ReaCS.Editor
             return tex;
         }
 
-        private void Connect(Port from, Port to)
+        private FlowingEdge Connect(Port from, Port to, Action<FlowingEdge> customize = null)
         {
-            var edge = new FlowingEdge();
-            AddElement(edge);
-
-            edge.output = from;
-            edge.input = to;
+            var edge = new FlowingEdge
+            {
+                output = from,
+                input = to
+            };
 
             from.Connect(edge);
             to.Connect(edge);
+            AddElement(edge);
 
             allFlowingEdges.Add(edge);
+
+            // Optional styling hook
+            customize?.Invoke(edge);
+
+            return edge;
         }
 
         public void ClearAllHighlights()
@@ -733,7 +1223,7 @@ namespace ReaCS.Editor
         }
 
         #region Zoom & Pan Focus
-        public void AnimateFrameAllNodes(long delayMs = 100, float padding = 50f)
+        public void AnimateFrameAllNodes(long delayMs = 100, float padding = 80f)
         {
             schedule.Execute(() =>
             {
@@ -753,7 +1243,7 @@ namespace ReaCS.Editor
             }
         }
 
-        public void ZoomToNode(string nodeId, float padding = 40f)
+        public void ZoomToNode(string nodeId, float padding = 60f)
         {
             if (!nodeMap.TryGetValue(nodeId, out var node))
                 return;
@@ -805,8 +1295,8 @@ namespace ReaCS.Editor
 
             EditorApplication.update += Step;
         }
-       
-        public void FrameAllNodes(float padding = 50f)
+
+        public void FrameAllNodes(float padding = 80f)
         {
             var nodeRects = graphElements
                 .OfType<Node>()
@@ -876,64 +1366,108 @@ namespace ReaCS.Editor
 
         public HashSet<string> BuildFilterSetForSO(ObservableScriptableObject so)
         {
-            var visibleNodes = new HashSet<string> { so.name };
+            var visible = new HashSet<string>();
+            var soType = so.GetType();
+            string groupKey = $"group:{soType.Name}";
 
-            var fields = so.GetType()
-                .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
-                .Where(f => Attribute.IsDefined(f, typeof(ObservableAttribute)) || Attribute.IsDefined(f, typeof(ObservableSavedAttribute)));
+            visible.Add(so.name); // The SO node
+            visible.Add($"{groupKey}:proxy"); // SO group proxy
+
+            var fields = GetObservedFields(so);
 
             foreach (var field in fields)
             {
                 string fieldId = $"{so.name}.{field.Name}";
-                visibleNodes.Add(fieldId);
+                string groupedFieldId = $"{groupKey}.{field.Name}";
+                string groupedSysProxy = $"{groupKey}.{field.Name}.sysProxy";
 
-                foreach (var system in AppDomain.CurrentDomain.GetAssemblies()
-                             .SelectMany(a => a.GetTypes())
-                             .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract))
-                {
-                    var attr = system.GetCustomAttribute<ReactToAttribute>();
-                    if (attr?.FieldName == field.Name &&
-                        system.BaseType?.GetGenericArguments()[0].IsAssignableFrom(so.GetType()) == true)
+                visible.Add(fieldId);
+                visible.Add(groupedFieldId);
+
+                var matchingSystems = AppDomain.CurrentDomain.GetAssemblies()
+                    .SelectMany(a => a.GetTypes())
+                    .Where(t =>
                     {
-                        visibleNodes.Add(system.Name);
-                    }
+                        var attr = t.GetCustomAttribute<ReactToAttribute>();
+                        if (attr == null) return false;
+
+                        var baseType = t.BaseType;
+                        if (baseType == null || !baseType.IsGenericType) return false;
+
+                        var args = baseType.GetGenericArguments();
+                        if (args.Length == 0) return false;
+
+                        return attr.FieldName == field.Name && args[0].IsAssignableFrom(soType);
+                    })
+                    .ToList();
+
+                foreach (var sysType in matchingSystems)
+                {
+                    visible.Add(sysType.FullName); // Correct ID used in nodeMap
+                }
+
+                if (matchingSystems.Count > 1)
+                {
+                    visible.Add(groupedSysProxy); // System proxy node
                 }
             }
 
-            return visibleNodes;
+            return visible;
         }
+
+
 
         public HashSet<string> BuildFilterSetForSystem(Type systemType)
         {
-            var visibleNodes = new HashSet<string> { systemType.Name };
+            var visible = new HashSet<string>();
+
+            // System node ID
+            visible.Add(systemType.Name);
 
             var attr = systemType.GetCustomAttribute<ReactToAttribute>();
-            if (attr != null)
+            if (attr == null) return visible;
+
+            string fieldName = attr.FieldName;
+
+            // Detect the target SO type
+            var soType = systemType.BaseType?.GetGenericArguments()[0];
+            if (soType == null) return visible;
+
+            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
             {
-                foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
-                {
-                    var field = so.GetType().GetField(attr.FieldName,
-                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    if (field != null)
-                    {
-                        visibleNodes.Add(so.name);
-                        visibleNodes.Add($"{so.name}.{field.Name}");
-                    }
-                }
+                if (!soType.IsAssignableFrom(so.GetType())) continue;
+
+                string soId = so.name;
+                string soGroupKey = $"group:{so.GetType().Name}";
+                string fieldId = $"{soGroupKey}.{fieldName}";
+                string sysProxyId = $"{soGroupKey}.{fieldName}.sysProxy";
+
+                // Core nodes
+                visible.Add(soId);
+                visible.Add(soGroupKey + ":proxy"); // SO group proxy
+                visible.Add(fieldId);
+
+                // Add system group proxy only if used
+                if (nodeMap.ContainsKey(sysProxyId))
+                    visible.Add(sysProxyId);
             }
 
-            return visibleNodes;
+            return visible;
         }
+
+
+
 
         private void PingNodeAsset(Node node)
         {
             if (!nodeToId.TryGetValue(node, out string nodeId))
-            {
-                Debug.LogWarning("Unknown node ID.");
                 return;
-            }
 
             if (node.userData is not NodeType type)
+                return;
+
+            // 🚫 Skip proxy nodes
+            if (nodeId.Contains(".sysProxy") || nodeId.Contains(":proxy"))
                 return;
 
             switch (type)
@@ -1015,6 +1549,23 @@ namespace ReaCS.Editor
             return divider;
         }
 
+    }
+    struct FieldReactionKey
+    {
+        public string FieldName;
+        public Type SOType;
+
+        public FieldReactionKey(string fieldName, Type soType)
+        {
+            FieldName = fieldName;
+            SOType = soType;
+        }
+
+        public override int GetHashCode() => FieldName.GetHashCode() ^ SOType.GetHashCode();
+        public override bool Equals(object obj) =>
+            obj is FieldReactionKey other &&
+            other.FieldName == FieldName &&
+            other.SOType == SOType;
     }
 }
 #endif

@@ -10,6 +10,10 @@ namespace ReaCS.Runtime
         public static event Action<ObservableScriptableObject> OnRegistered;
         public static event Action<ObservableScriptableObject> OnUnregistered;
 
+#if UNITY_EDITOR
+        public static Action<string, string> OnEditorFieldChanged;
+#endif
+
         public static void Register(ObservableScriptableObject so)
         {
 /*#if UNITY_EDITOR
