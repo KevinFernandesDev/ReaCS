@@ -1,11 +1,9 @@
 using System;
 using ReaCS.Runtime;
-using ReaCS.Runtime.Internal;
-using UnityEngine;
+using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.Shared
 {
-    [CreateAssetMenu(menuName = "ReaCS/Test/DebounceTestSO")]
     public class DebounceTestSO : ObservableScriptableObject
     {
         [Observable] public Observable<int> number;

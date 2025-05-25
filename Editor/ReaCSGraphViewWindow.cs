@@ -8,7 +8,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using ReaCS.Runtime;
 using ReaCS.Runtime.Internal;
-using ReaCS.Runtime.Internal.Debugging;
+using ReaCS.Runtime.Core;
 
 namespace ReaCS.Editor
 {
@@ -135,6 +135,9 @@ namespace ReaCS.Editor
 
             if (Application.isPlaying)
             {
+                ReaCSBurstHistory.Init(); // ensure _entries is created and _backup copied in
+                RefreshHistoryView();     // immediately fill the scroll view
+
                 // Automatically reset view when entering play mode
                 HandleReset();
             }

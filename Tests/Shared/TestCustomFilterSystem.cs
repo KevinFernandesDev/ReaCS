@@ -1,5 +1,4 @@
-using ReaCS.Runtime;
-using ReaCS.Runtime.Internal;
+using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.Shared
 {

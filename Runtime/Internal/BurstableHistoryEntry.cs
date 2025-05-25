@@ -1,7 +1,7 @@
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace ReaCS.Runtime.Internal.Debugging
+namespace ReaCS.Runtime.Internal
 {
     public struct BurstableHistoryEntry
     {

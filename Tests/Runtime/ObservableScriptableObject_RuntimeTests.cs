@@ -1,5 +1,6 @@
 ﻿using NUnit.Framework;
 using ReaCS.Runtime;
+using ReaCS.Runtime.Core;
 using ReaCS.Runtime.Internal;
 using ReaCS.Tests.Shared;
 using System.Collections;

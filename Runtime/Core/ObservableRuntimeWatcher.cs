@@ -1,17 +1,17 @@
-﻿using ReaCS.Runtime.Internal;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Jobs;
 using UnityEngine;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Core
 {
     [DefaultExecutionOrder(-10000)]
     public class ObservableRuntimeWatcher : MonoBehaviour
     {
         private static ObservableRuntimeWatcher _instance;
+        private static bool _isInitialized = false;
 
         private static Dictionary<ObservableScriptableObject, int> _objectToId = new();
         private static List<ObservableScriptableObject> _idToObject = new();
@@ -38,6 +38,7 @@ namespace ReaCS.Runtime
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void Init()
         {
+            if (!_isInitialized) return;
             if (_instance == null)
             {
                 var go = new GameObject("ObservableRuntimeWatcher");
@@ -125,9 +126,20 @@ namespace ReaCS.Runtime
             }
         }
 
+        private void Awake()
+        {
+            if (!_isInitialized) return;
+            if (!_debouncedIds.IsCreated)
+                _debouncedIds = new NativeList<int>(100, Allocator.Persistent);
+            if (!_debounceTimers.IsCreated)
+                _debounceTimers = new NativeHashMap<int, float>(100, Allocator.Persistent);
+            if (!_readyToUpdate.IsCreated)
+                _readyToUpdate = new NativeList<int>(100, Allocator.Persistent);
+        }
+
         private void Update()
         {
-            if (_debouncedIds.Length == 0)
+            if (!_debouncedIds.IsCreated || _debouncedIds.Length == 0)
                 return;
 
             var job = new TickDebounceJob

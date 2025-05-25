@@ -1,5 +1,5 @@
 #if UNITY_EDITOR
-using ReaCS.Runtime;
+using ReaCS.Runtime.Core;
 using UnityEditor;
 using UnityEngine;
 

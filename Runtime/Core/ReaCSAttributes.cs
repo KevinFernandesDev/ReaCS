@@ -1,6 +1,6 @@
 using System;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Core
 {
     [AttributeUsage(AttributeTargets.Field)]
     public class ObservableAttribute : Attribute { }

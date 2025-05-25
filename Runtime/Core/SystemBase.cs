@@ -3,7 +3,7 @@ using System.Collections;
 using System.Reflection;
 using UnityEngine;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Core
 {
     public abstract class SystemBase<TSO> : MonoBehaviour
         where TSO : ObservableScriptableObject

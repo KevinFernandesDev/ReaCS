@@ -1,7 +1,14 @@
-using System;
+﻿using System;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Internal
 {
+    /// <summary>
+    /// Temporarily track the name of the system currently running.
+    /// This value is then recorded in LogToBurstHistory(...)
+    /// So your graph/debugger/history can say: “This value was changed by 'MySystem'.”
+    /// It's used by runtime debug graphs, history debug and is a way to label cause chains.
+    /// It's thread-safe for jobs & parallel processing, and fast (no lookup or instantiation)
+    /// </summary>
     public static class SystemContext
     {
         [ThreadStatic] private static string _activeSystemName;

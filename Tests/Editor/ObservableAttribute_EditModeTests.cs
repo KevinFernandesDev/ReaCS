@@ -1,6 +1,6 @@
 using NUnit.Framework;
 using ReaCS.Runtime;
-using ReaCS.Runtime.Internal;
+using ReaCS.Runtime.Core;
 using System;
 
 namespace ReaCS.Tests.EditMode

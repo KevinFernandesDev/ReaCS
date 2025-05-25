@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using ReaCS.Runtime;
 using ReaCS.Runtime.Internal;
+using ReaCS.Runtime.Core;
 
 namespace ReaCS.Editor
 {

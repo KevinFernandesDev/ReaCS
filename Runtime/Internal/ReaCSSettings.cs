@@ -1,4 +1,4 @@
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Internal
 {
     public static partial class ReaCSSettings
     {

@@ -1,10 +1,9 @@
 using ReaCS.Runtime.Internal;
-using ReaCS.Runtime.Internal.Debugging;
 using System;
 using Unity.Collections;
 using UnityEngine;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Core
 {
     [Serializable]
     public class Observable<T> : IInitializableObservable
@@ -17,9 +16,9 @@ namespace ReaCS.Runtime
 
         private static readonly bool _enableDebug =
 #if UNITY_EDITOR
-            true;
+        true;
 #else
-            false;
+        false;
 #endif
 
         private static readonly bool _logHistory = true;
@@ -62,6 +61,7 @@ namespace ReaCS.Runtime
 
         private void LogToBurstHistory(T oldVal, T newVal)
         {
+            ReaCSBurstHistory.Init(); // Ensures burst history is ready even after domain reload
             var so = new FixedString64Bytes(owner?.name ?? "null");
             var field = new FixedString64Bytes(fieldName);
             var sys = new FixedString64Bytes(SystemContext.ActiveSystemName ?? "Unknown");

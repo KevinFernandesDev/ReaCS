@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Internal
 {
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public static class ReaCSDebug

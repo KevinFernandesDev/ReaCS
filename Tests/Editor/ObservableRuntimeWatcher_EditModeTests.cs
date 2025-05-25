@@ -1,5 +1,5 @@
 using NUnit.Framework;
-using ReaCS.Runtime;
+using ReaCS.Runtime.Core;
 using ReaCS.Tests.Shared;
 using UnityEngine;
 

@@ -1,5 +1,5 @@
 using ReaCS.Runtime;
-using ReaCS.Runtime.Internal;
+using ReaCS.Runtime.Core;
 using UnityEngine;
 
 namespace ReaCS.Tests.Shared

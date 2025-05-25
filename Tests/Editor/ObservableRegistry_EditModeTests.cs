@@ -2,9 +2,9 @@ using NUnit.Framework;
 using ReaCS.Runtime;
 using UnityEngine;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using ReaCS.Tests.Shared;
+using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.EditMode
 {
