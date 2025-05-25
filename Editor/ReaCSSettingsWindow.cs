@@ -1,8 +1,6 @@
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine;
-using ReaCS.Shared;
-using ReaCS.Runtime.Internal;
 
 namespace ReaCS.Editor
 {

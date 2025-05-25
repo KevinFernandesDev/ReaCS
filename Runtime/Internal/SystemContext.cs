@@ -1,6 +1,6 @@
 using System;
 
-namespace ReaCS.Runtime.Internal
+namespace ReaCS.Runtime
 {
     public static class SystemContext
     {

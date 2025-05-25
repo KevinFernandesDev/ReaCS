@@ -1,4 +1,4 @@
-namespace ReaCS.Shared
+namespace ReaCS.Runtime
 {
     public static partial class ReaCSSettings
     {

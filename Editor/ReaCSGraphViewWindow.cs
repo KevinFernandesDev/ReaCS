@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using ReaCS.Runtime;
 using ReaCS.Runtime.Internal;
-using ReaCS.Shared;
 using ReaCS.Runtime.Internal.Debugging;
 
 namespace ReaCS.Editor

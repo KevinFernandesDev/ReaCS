@@ -1,7 +1,13 @@
 using System;
 
-namespace ReaCS.Runtime.Internal
+namespace ReaCS.Runtime
 {
+    [AttributeUsage(AttributeTargets.Field)]
+    public class ObservableAttribute : Attribute { }
+
+    [AttributeUsage(AttributeTargets.Field)]
+    public class ObservableSavedAttribute : Attribute { }
+
     [AttributeUsage(AttributeTargets.Class, Inherited = false, AllowMultiple = false)]
     public sealed class ReactToAttribute : Attribute
     {

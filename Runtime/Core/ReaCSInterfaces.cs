@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace ReaCS.Runtime
 {
     public interface IInitializableObservable
