@@ -1,0 +1,34 @@
+/*.node {
+    background-color: #2a2a2a;
+    border-radius: 5px;
+}*/
+
+.reaCS-group-box {
+    border-color: #444;
+    border-width: 1px;
+    border-radius: 10px;
+    background-color: rgba(255, 255, 255, 0.02);
+    margin: 4px;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+}
+
+.reaCS-group-box .unity-group__header {
+    display: none;
+}
+
+.reaCS-group-title {
+    font-size: 13px;
+    -unity-font-style: bold;
+    color: white;
+    background-color: rgba(0, 100, 100, 0.25);
+    padding: 6px 12px;
+    border-bottom: 1px solid #333;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+}
+
+/* Content padding */
+.reaCS-group-box .unity-group__content {
+    padding: 6px 8px;
+}

@@ -14,7 +14,7 @@ namespace ReaCS.Editor
 {
     public class ReaCSGraphViewWindow : EditorWindow
     {
-        private ReaCSGraphView graphView;
+        private StaticDependencyGraphView graphView;
         private Label statusLabel;
         private Button resetButton;
         private Toggle lockToggle;
@@ -24,11 +24,11 @@ namespace ReaCS.Editor
         private VisualElement _drawerContainer;
         private string _searchQuery = string.Empty;
 
-        [MenuItem("Window/ReaCS/Node Graph Visualizer")]
+        [MenuItem("Window/ReaCS/Static Dependency Graph")]
         public static void Open()
         {
             var wnd = GetWindow<ReaCSGraphViewWindow>();
-            wnd.titleContent = new GUIContent("ReaCS Node Graph");
+            wnd.titleContent = new GUIContent("Static Dependency Graph");
         }
 
         public void OnEnable()
@@ -400,7 +400,7 @@ namespace ReaCS.Editor
 
         private void ConstructGraphView()
         {
-            graphView = new ReaCSGraphView
+            graphView = new StaticDependencyGraphView
             {
                 name = "ReaCS Graph View"
             };

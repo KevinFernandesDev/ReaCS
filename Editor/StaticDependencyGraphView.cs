@@ -15,7 +15,7 @@ namespace ReaCS.Editor
 {
     public enum NodeType { SO, Field, System }
 
-    public class ReaCSGraphView : GraphView
+    public class StaticDependencyGraphView : GraphView
     {
         private readonly Vector2 defaultNodeSize = new(200, 80);
         private Dictionary<string, Node> nodeMap = new();
@@ -48,11 +48,9 @@ namespace ReaCS.Editor
         private readonly Dictionary<(Type, string), FieldInfo> fieldDictInfoCache = new();
         private Dictionary<Type, PropertyInfo> valuePropCache = new(); // Value property cache
 
-
-
         float CenteredStartY(float centerY, int count, float spacing) => centerY - (count * spacing) / 2f;
 
-        public ReaCSGraphView()
+        public StaticDependencyGraphView()
         {
             TryLoadStyleSheet("ReaCSGraphViewStyles");
 
@@ -138,7 +136,7 @@ namespace ReaCS.Editor
 
             // Fallback for Package-based .uss
 #if UNITY_EDITOR
-            string packageRelativePath = "Packages/com.yourcompany.reacs/Editor/Styles/ReaCSGraphViewStyles.uss";
+            string packageRelativePath = "Packages/com.kevinfernandesdev.reacs/Editor/Styles/ReaCSGraphViewStyles.uss";
             styleSheet = AssetDatabase.LoadAssetAtPath<StyleSheet>(packageRelativePath);
             if (styleSheet != null)
             {

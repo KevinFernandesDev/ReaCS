@@ -19,6 +19,7 @@ namespace ReaCS.Runtime.Core
         T DataSource { get; }
         bool UseAsTemplate { get; }
     }
+
     public interface IHasUnityComponent<T> where T : Component
     {
         T UnityComponent { get; set; }
