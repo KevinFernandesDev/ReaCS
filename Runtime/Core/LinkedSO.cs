@@ -4,7 +4,7 @@ namespace ReaCS.Runtime.Core
         where TLeft : ObservableScriptableObject
         where TRight : ObservableScriptableObject
     {
-        public Observable<TLeft> Left = new();
-        public Observable<TRight> Right = new();
+        public ObservableSO<TLeft> Left = new();
+        public ObservableSO<TRight> Right = new();
     }
 }

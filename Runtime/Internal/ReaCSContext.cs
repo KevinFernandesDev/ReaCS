@@ -12,8 +12,6 @@ namespace ReaCS.Runtime.Internal
             public static readonly T instance = new();
         }
 
-
-
         private static class UseCache<T> where T : IReaCSService, new()
         {
             public static readonly T instance = new();

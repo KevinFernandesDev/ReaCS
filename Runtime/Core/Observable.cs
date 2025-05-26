@@ -59,6 +59,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
+
         private void LogToBurstHistory(T oldVal, T newVal)
         {
             ReaCSBurstHistory.Init(); // Ensures burst history is ready even after domain reload

@@ -3,9 +3,6 @@
     "rootNamespace": "ReaCS.Editor",
     "references": [
         "ReaCS.Runtime",
-        "ReaCS.Runtime.Internal",
-        "ReaCS.Shared",
-        "ReaCS.Runtime.Internal.Debugging",
         "Unity.Burst",
         "Unity.Collections",
         "Unity.Mathematics"

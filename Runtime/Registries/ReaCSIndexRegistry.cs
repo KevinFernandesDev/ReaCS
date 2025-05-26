@@ -25,13 +25,35 @@ namespace ReaCS.Runtime.Registries
 
         public void Unregister(ObservableScriptableObject so)
         {
+            if (so == null) return;
+
             var type = so.GetType();
+
+            // Remove from typed registry
             if (activeByType.TryGetValue(type, out var list))
                 list.Remove(so);
 
+            // If it's a link itself, remove directly from the allLinks list
             if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkedSO<,>))
+            {
                 allLinks.Remove(so);
+                return;
+            }
+
+            // Otherwise, remove any links that reference this SO (Left or Right)
+            allLinks.RemoveAll(link =>
+            {
+                var linkType = link.GetType();
+                var leftField = linkType.GetField("Left");
+                var rightField = linkType.GetField("Right");
+
+                var left = leftField?.GetValue(link) as IObservableReference;
+                var right = rightField?.GetValue(link) as IObservableReference;
+
+                return left?.Value == so || right?.Value == so;
+            });
         }
+
 
         public IEnumerable<T> GetAll<T>() where T : ObservableScriptableObject
         {

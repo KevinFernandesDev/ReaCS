@@ -144,7 +144,7 @@ namespace ReaCS.Runtime.Core
 
             if (fieldName == _observedField)
             {
-                ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}"); 
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
                 Debug.Log($"[SystemBase] Matching field! Pushing system context: {GetType().Name}");
                 SystemContext.WithSystem(GetType().Name, () => OnFieldChanged((TSO)so));
             }

@@ -4,6 +4,11 @@ using System.Collections.Generic;
 
 namespace ReaCS.Runtime
 {
+    /// <summary>
+    /// ObservableRegistry is useful for live editor tooling and system subscription (like in SystemBase<TSO>).
+    /// It's mostly used for having an index of edit-time SO population.
+    /// It handles system subscriptions to know when a field changed, and is heavily used by the graph window. 
+    /// </summary>
     public static class ObservableRegistry
     {
         private static readonly Dictionary<Type, List<ObservableScriptableObject>> _instances = new();
@@ -11,7 +16,8 @@ namespace ReaCS.Runtime
         public static event Action<ObservableScriptableObject> OnUnregistered;
 
 #if UNITY_EDITOR
-        public static Action<string, string> OnEditorFieldChanged;
+        public static Action<string, string> OnEditorFieldChanged = delegate { };
+
 #endif
 
         public static void Register(ObservableScriptableObject so)

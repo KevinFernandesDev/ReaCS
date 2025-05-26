@@ -2,7 +2,8 @@
     "name": "ReaCS.Examples",
     "rootNamespace": "",
     "references": [
-        "GUID:ed992cba9c7d0114ca834a9a83392c44"
+        "GUID:ed992cba9c7d0114ca834a9a83392c44",
+        "GUID:d8b63aba1907145bea998dd612889d6b"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
