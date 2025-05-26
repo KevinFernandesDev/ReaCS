@@ -1,10 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using Unity.Burst;
 using Unity.Collections;
 using UnityEngine;
-using ReaCS.Runtime;
 using ReaCS.Runtime.Core;
 using ReaCS.Runtime.Services;
 using static ReaCS.Runtime.Internal.ReaCSContext;
@@ -38,7 +35,7 @@ namespace ReaCS.Runtime
                 yield return bindings[i].data;
         }
 
-        public IEnumerable<TBinding> GetBindingsForEntity<T, TBinding>(EntityId id)
+        public IEnumerable<TBinding> GetBindingsForEntity<T, TBinding>(ReaCSEntityId id)
             where T : ObservableScriptableObject, new()
             where TBinding : ComponentDataBinding<T>
         {

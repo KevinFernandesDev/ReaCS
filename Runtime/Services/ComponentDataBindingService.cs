@@ -65,7 +65,7 @@ namespace ReaCS.Runtime.Services
             return ListPool<ComponentDataBinding<TSO>>.Empty;
         }
 
-        public List<ComponentDataBinding<TSO>> GetAllForEntity(EntityId entityId)
+        public List<ComponentDataBinding<TSO>> GetAllForEntity(ReaCSEntityId entityId)
             => GetAllForEntity(entityId.Value);
     }
 

@@ -8,24 +8,24 @@ namespace ReaCS.Runtime.Core
     /// Assigned at runtime via SharedEntityIdService.
     /// </summary>
     [Serializable]
-    public struct EntityId : IEquatable<EntityId>
+    public struct ReaCSEntityId : IEquatable<ReaCSEntityId>
     {
         [SerializeField] private int value;
 
         public int Value => value;
-        public static readonly EntityId None = new EntityId(0);
+        public static readonly ReaCSEntityId None = new ReaCSEntityId(0);
 
-        public EntityId(int id) => value = id;
+        public ReaCSEntityId(int id) => value = id;
 
-        public static implicit operator int(EntityId id) => id.value;
-        public static implicit operator EntityId(int id) => new EntityId(id);
+        public static implicit operator int(ReaCSEntityId id) => id.value;
+        public static implicit operator ReaCSEntityId(int id) => new ReaCSEntityId(id);
 
-        public bool Equals(EntityId other) => value == other.value;
-        public override bool Equals(object obj) => obj is EntityId other && Equals(other);
+        public bool Equals(ReaCSEntityId other) => value == other.value;
+        public override bool Equals(object obj) => obj is ReaCSEntityId other && Equals(other);
         public override int GetHashCode() => value;
         public override string ToString() => $"EntityId({value})";
 
-        public static bool operator ==(EntityId a, EntityId b) => a.value == b.value;
-        public static bool operator !=(EntityId a, EntityId b) => a.value != b.value;
+        public static bool operator ==(ReaCSEntityId a, ReaCSEntityId b) => a.value == b.value;
+        public static bool operator !=(ReaCSEntityId a, ReaCSEntityId b) => a.value != b.value;
     }
 }
