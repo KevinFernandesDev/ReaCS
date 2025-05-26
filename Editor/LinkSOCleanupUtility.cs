@@ -1,12 +1,12 @@
 ﻿#if UNITY_EDITOR
 using ReaCS.Runtime;
 using ReaCS.Runtime.Core;
-using ReaCS.Runtime.Services;
+using ReaCS.Runtime.Registries;
 using System;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using static ReaCS.Runtime.Internal.ReaCSContext;
+using static ReaCS.Runtime.ReaCS;
 
 namespace ReaCS.Editor
 {
@@ -15,7 +15,7 @@ namespace ReaCS.Editor
         [MenuItem("Tools/ReaCS/Cleanup Broken LinkSOs")]
         public static void CleanupBrokenLinks()
         {
-            var service = Use<LinkedSOService>();
+            var service = Query<LinkSORegistry>();
             int cleaned = 0;
 
             var allTypes = AppDomain.CurrentDomain
@@ -63,7 +63,7 @@ namespace ReaCS.Editor
         {
             while (type != null && type != typeof(object))
             {
-                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkedSO<,>))
+                if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkSO<,>))
                     return true;
                 type = type.BaseType;
             }

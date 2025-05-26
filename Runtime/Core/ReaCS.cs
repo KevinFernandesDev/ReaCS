@@ -1,8 +1,8 @@
 using ReaCS.Runtime.Core;
 
-namespace ReaCS.Runtime.Internal
+namespace ReaCS.Runtime
 { 
-    public static class ReaCSContext
+    public static class ReaCS
     {
         public static T Query<T>() where T : IReaCSQuery, new() => QueryCache<T>.instance;
         public static T Use<T>() where T : IReaCSService, new() => UseCache<T>.instance;

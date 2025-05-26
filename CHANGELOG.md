@@ -1,5 +1,48 @@
 # 📦 Changelog
 
+## [1.1.1] – 2025-05-26 — Link Tree Graph & LinkSO/ObservableScriptableObject Visualization
+
+### ✨ Added
+
+* **`LinkTreeGraphView`**:
+  A fully recursive visual explorer for `LinkSO<TLeft, TRight>` relationships.
+
+  * Starting from any `ObservableScriptableObject`, it renders a directional graph showing how objects are linked.
+  * Highlights the root node.
+  * Pressing `P` on a node pings the asset in the Project window.
+  * Built-in **MiniMap**, zoom, and pan support.
+  * Automatically centers view after generating the graph.
+
+* **Auto-open Link Graph**:
+  Selecting an `ObservableScriptableObject` in the **Project window** automatically opens the Link Tree Graph.
+
+* **Traversal Enhancements**:
+
+  * Prevents infinite cycles and redundant links.
+  * Follows `TLeft ➔ TRight` directionality for visual clarity.
+  * Skips links already visually expressed in the graph.
+  * When a node is expanded, it spawns a new tree section rather than reusing global shared nodes.
+
+### 🛠 Changed
+
+* **SO Inspector UI**:
+
+  * Removed the "Open Link Tree Graph" button.
+  * Replaced with static display showing how many links are present for the current `ObservableScriptableObject`.
+
+* **Graph Layout Improvements**:
+
+  * Added `FrameGraphToCenter()` after layout generation to ensure nodes are centered and spaced correctly.
+  * Fixed cases where nodes would render off-screen or to the top-left due to early layout timing.
+
+### 🐛 Fixed
+
+* 🧠 Nodes are no longer duplicated when expanding new links (unless explicitly allowed for visual clarity).
+* ♻ The root node is no longer overridden or skipped during recursive expansion.
+* 🎯 `PingObject` now works correctly for all node types and expansion states.
+* 🎨 Nodes are placed consistently and logically with vertical spacing depending on number of links.
+
+
 ##  [1.1.0] 26/05/2025 — Entity-Based Binding Overhaul
 
 ### ✨ Added

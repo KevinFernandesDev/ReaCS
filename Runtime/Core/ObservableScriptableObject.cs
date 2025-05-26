@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
+using static ReaCS.Runtime.ReaCS;
 
 namespace ReaCS.Runtime.Core
 {
@@ -23,8 +24,8 @@ namespace ReaCS.Runtime.Core
         protected virtual void OnEnable()
         {
             ObservableRegistry.Register(this);
-            ObservableRuntimeWatcher.Register(this); 
-            ReaCSContext.Query<ReaCSIndexRegistry>().Register(this);
+            ObservableRuntimeWatcher.Register(this);
+            Query<ReaCSIndexRegistry>().Register(this);
 
 
             InitializeFields();
@@ -38,7 +39,7 @@ namespace ReaCS.Runtime.Core
         {
             ObservableRegistry.Unregister(this);
             ObservableRuntimeWatcher.Unregister(this);
-            ReaCSContext.Query<ReaCSIndexRegistry>().Unregister(this);
+            Query<ReaCSIndexRegistry>().Unregister(this);
 
 #if !UNITY_EDITOR
             SaveStateToJson();

@@ -1,4 +1,4 @@
-﻿using static ReaCS.Runtime.Internal.ReaCSContext;
+﻿using static ReaCS.Runtime.ReaCS;
 using ReaCS.Runtime.Registries;
 using ReaCS.Runtime.Services;
 using UnityEngine;

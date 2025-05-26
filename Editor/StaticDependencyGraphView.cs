@@ -1577,6 +1577,7 @@ namespace ReaCS.Editor
         }
 
     }
+
     struct FieldReactionKey
     {
         public string FieldName;

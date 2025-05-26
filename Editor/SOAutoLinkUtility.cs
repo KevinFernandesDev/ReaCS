@@ -40,7 +40,7 @@ namespace ReaCS.Editor
             var leftType = left.GetType();
             var rightType = right.GetType();
 
-            var linkType = typeof(LinkedSO<,>).MakeGenericType(leftType, rightType);
+            var linkType = typeof(LinkSO<,>).MakeGenericType(leftType, rightType);
             var link = ScriptableObject.CreateInstance(linkType);
 
             // Use reflection to set Left/Right

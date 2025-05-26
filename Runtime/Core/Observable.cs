@@ -9,7 +9,7 @@ namespace ReaCS.Runtime.Core
     public class Observable<T> : IInitializableObservable
     {
         [SerializeField] public bool ShouldPersist = false;
-        [SerializeField] private T value;
+        [SerializeField] public T value;
 
         [NonSerialized] private ObservableScriptableObject owner;
         [NonSerialized] private string fieldName;

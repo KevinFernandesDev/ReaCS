@@ -4,7 +4,7 @@ using Unity.Collections;
 using UnityEngine;
 using ReaCS.Runtime.Core;
 using ReaCS.Runtime.Services;
-using static ReaCS.Runtime.Internal.ReaCSContext;
+using static ReaCS.Runtime.ReaCS;
 using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Runtime

@@ -21,6 +21,7 @@ namespace ReaCS.Runtime.Core
         private static NativeList<int> _readyToUpdate;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+
         private static void ResetStatics()
         {
             _objectToId.Clear();
@@ -32,13 +33,16 @@ namespace ReaCS.Runtime.Core
 
             _debouncedIds = new NativeList<int>(100, Allocator.Persistent);
             _debounceTimers = new NativeHashMap<int, float>(100, Allocator.Persistent);
-            _readyToUpdate = new NativeList<int>(100, Allocator.Persistent);
+            _readyToUpdate = new NativeList<int>(100, Allocator.Persistent); 
+            
+            Debug.Log("[ReaCS] ResetStatics called");
+
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void Init()
         {
-            if (!_isInitialized) return;
+            if (_isInitialized) return;
             if (_instance == null)
             {
                 var go = new GameObject("ObservableRuntimeWatcher");
@@ -66,12 +70,18 @@ namespace ReaCS.Runtime.Core
             if (_objectToId.TryGetValue(so, out int id))
             {
                 _objectToId.Remove(so);
-                // Note: we leave _idToObject alone for safety (sparse array)
-                _debounceTimers.Remove(id);
-                RemoveId(_debouncedIds, id);
-                RemoveId(_readyToUpdate, id);
+
+                if (_debounceTimers.IsCreated && _debounceTimers.ContainsKey(id))
+                    _debounceTimers.Remove(id);
+
+                if (_debouncedIds.IsCreated)
+                    RemoveId(_debouncedIds, id);
+
+                if (_readyToUpdate.IsCreated)
+                    RemoveId(_readyToUpdate, id);
             }
         }
+
 
         private static void RemoveId(NativeList<int> list, int id)
         {

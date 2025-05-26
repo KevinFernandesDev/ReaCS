@@ -4,8 +4,9 @@ using UnityEngine;
 using System;
 using System.Reflection;
 using System.Collections.Generic;
-using ReaCS.Runtime;
 using ReaCS.Runtime.Core;
+using static ReaCS.Runtime.ReaCS;
+using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Editor
 {
@@ -63,7 +64,6 @@ namespace ReaCS.Editor
                 EditorGUILayout.BeginHorizontal();
 
                 string label = ObjectNames.NicifyVariableName(field.Name);
-
                 object newValue = DrawField(label, currentValue);
                 if (!Equals(newValue, currentValue))
                 {
@@ -79,7 +79,17 @@ namespace ReaCS.Editor
                 EditorGUILayout.EndHorizontal();
             }
 
+            // Draw the rest of the SO fields below Observables
+            var excluded = new List<string> { "m_Script" };
+            foreach (var field in observableFields)
+                excluded.Add(field.Name);
+
+            DrawPropertiesExcluding(serializedObject, excluded.ToArray());
+
             serializedObject.ApplyModifiedProperties();
+
+            EditorGUILayout.Space(12);
+            DrawLinkInfo(targetSO); // 👇 now at the bottom
         }
 
         private object DrawField(string label, object value)
@@ -97,6 +107,14 @@ namespace ReaCS.Editor
 
             EditorGUILayout.LabelField(label, "Unsupported type");
             return value;
+        }
+
+        private void DrawLinkInfo(ObservableScriptableObject oso)
+        {
+            var linkCount = Query<LinkSORegistry>().CountLinksFor(oso);
+
+            EditorGUILayout.LabelField("Link Tree", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField($"🔗 {linkCount} links found", EditorStyles.helpBox);
         }
     }
 }

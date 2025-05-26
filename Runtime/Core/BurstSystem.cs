@@ -3,7 +3,7 @@ using Unity.Jobs;
 using Unity.Burst;
 using Unity.Collections;
 using System.Collections.Generic;
-using ReaCS.Runtime.Internal;
+using static ReaCS.Runtime.ReaCS;
 using ReaCS.Runtime.Registries;
 using System.Linq;
 
@@ -22,7 +22,7 @@ namespace ReaCS.Runtime.Core
 
         void Update()
         {
-            var registry = ReaCSContext.Query<ReaCSIndexRegistry>();
+            var registry = Query<ReaCSIndexRegistry>();
             _sources = registry.GetAll<TSO>().ToList();
 
             if (_sources.Count == 0)

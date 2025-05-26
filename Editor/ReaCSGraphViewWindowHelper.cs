@@ -7,7 +7,7 @@ namespace ReaCS.Editor
     {
         public static void ResetOpenGraphView()
         {
-            var window = Resources.FindObjectsOfTypeAll<ReaCSGraphViewWindow>().FirstOrDefault();
+            var window = Resources.FindObjectsOfTypeAll<StaticDependencyGraphWindow>().FirstOrDefault();
             if (window != null)
             {
                 window.HandleReset();

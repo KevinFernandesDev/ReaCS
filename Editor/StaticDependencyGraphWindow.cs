@@ -12,7 +12,7 @@ using ReaCS.Runtime.Core;
 
 namespace ReaCS.Editor
 {
-    public class ReaCSGraphViewWindow : EditorWindow
+    public class StaticDependencyGraphWindow : EditorWindow
     {
         private StaticDependencyGraphView graphView;
         private Label statusLabel;
@@ -24,10 +24,10 @@ namespace ReaCS.Editor
         private VisualElement _drawerContainer;
         private string _searchQuery = string.Empty;
 
-        [MenuItem("Window/ReaCS/Static Dependency Graph")]
+        [MenuItem("ReaCS/Static Dependency Graph")]
         public static void Open()
         {
-            var wnd = GetWindow<ReaCSGraphViewWindow>();
+            var wnd = GetWindow<StaticDependencyGraphWindow>();
             wnd.titleContent = new GUIContent("Static Dependency Graph");
         }
 

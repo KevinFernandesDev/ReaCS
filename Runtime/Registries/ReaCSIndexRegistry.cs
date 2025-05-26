@@ -19,7 +19,7 @@ namespace ReaCS.Runtime.Registries
                 activeByType[type] = list = new();
             list.Add(so);
 
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkedSO<,>))
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkSO<,>))
                 allLinks.Add(so);
         }
 
@@ -34,7 +34,7 @@ namespace ReaCS.Runtime.Registries
                 list.Remove(so);
 
             // If it's a link itself, remove directly from the allLinks list
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkedSO<,>))
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkSO<,>))
             {
                 allLinks.Remove(so);
                 return;
@@ -96,18 +96,18 @@ namespace ReaCS.Runtime.Registries
             where TLeft : ObservableScriptableObject
             where TRight : ObservableScriptableObject
         {
-            return allLinks.OfType<LinkedSO<TLeft, TRight>>()
-                .Where(link => link.Left.Value == left)
-                .Select(link => link.Right.Value);
+            return allLinks.OfType<LinkSO<TLeft, TRight>>()
+                .Where(link => (TLeft)link.Left == left)
+                .Select(link => (TRight)link.Right);
         }
 
         public IEnumerable<TLeft> GetLinkedOwner<TLeft, TRight>(TRight right)
             where TLeft : ObservableScriptableObject
             where TRight : ObservableScriptableObject
         {
-            return allLinks.OfType<LinkedSO<TLeft, TRight>>()
-                .Where(link => link.Right.Value == right)
-                .Select(link => link.Left.Value);
+            return allLinks.OfType<LinkSO<TLeft, TRight>>()
+                .Where(link => (TRight)link.Right == right)
+                .Select(link => (TLeft)link.Left);
         }
     }
 }

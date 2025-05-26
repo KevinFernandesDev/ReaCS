@@ -1,6 +1,6 @@
 {
     "name": "com.kevinfernandesdev.reacs",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "displayName": "ReaCS - Reactive Component System",
     "description": "A lightweight ECS-inspired reactive data model using ScriptableObjects.",
     "unity": "6.0",
