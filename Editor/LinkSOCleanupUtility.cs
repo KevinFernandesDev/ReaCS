@@ -6,7 +6,7 @@ using System;
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
-using static ReaCS.Runtime.ReaCS;
+using static ReaCS.Runtime.Access;
 
 namespace ReaCS.Editor
 {

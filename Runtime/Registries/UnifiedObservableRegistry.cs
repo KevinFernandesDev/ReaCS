@@ -4,14 +4,14 @@ using Unity.Collections;
 using UnityEngine;
 using ReaCS.Runtime.Core;
 using ReaCS.Runtime.Services;
-using static ReaCS.Runtime.ReaCS;
+using static ReaCS.Runtime.Access;
 using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Runtime
 {
     public class UnifiedObservableRegistry : IReaCSQuery
     {
-        private readonly ReaCSIndexRegistry _index = Query<ReaCSIndexRegistry>();
+        private readonly IndexRegistry _index = Query<IndexRegistry>();
 
         public IEnumerable<T> GetAllRuntime<T>() where T : ObservableScriptableObject
             => _index.GetAll<T>();

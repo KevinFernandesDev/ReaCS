@@ -22,7 +22,12 @@ namespace ReaCS.Editor
                 {
                     if (Selection.activeObject == oso) // Still selected
                     {
-                        LinkTreeGraphWindow.ShowForRoot(oso);
+                        // Only proceed if window is already open
+                        var openWindow = EditorWindow.HasOpenInstances<LinkTreeGraphWindow>();
+                        if (openWindow)
+                        {
+                            LinkTreeGraphWindow.ShowForRoot(oso);
+                        }
                     }
                 };
             }

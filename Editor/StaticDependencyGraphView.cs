@@ -524,16 +524,6 @@ namespace ReaCS.Editor
                 .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
                 .ToList();
 
-            /*// ✅ Filter SOs by name or field before grouping
-            if (filter != null)
-            {
-                allSOs = allSOs.Where(so =>
-                    filter.Contains(so.name) ||
-                    GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
-                    .ToArray();
-            }*/
-            // Do NOT filter out SOs globally – we need all types to find the systems that match
-
             var groupedByType = allSOs
                 .GroupBy(so => so.GetType())
                 .ToDictionary(g => g.Key, g => g.ToList());
@@ -543,7 +533,8 @@ namespace ReaCS.Editor
             float xField = xProxy + 300f;
             float xSystem = xField + 400f;
             float xSystemGroup = xSystem + 260f;
-            float y = 0f;
+            float yCursor = 0f;
+            float lastUsedY = 0f;
             float verticalSpacing = 140f;
 
             if (filter != null)
@@ -573,6 +564,8 @@ namespace ReaCS.Editor
                         GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
                     .ToList();
 
+                yCursor = Mathf.Max(yCursor, lastUsedY + 80f);
+
                 if (allTypeSOs.Count == 1)
                 {
                     var so = allTypeSOs[0];
@@ -580,14 +573,14 @@ namespace ReaCS.Editor
                     string soId = so.name;
 
                     int fieldCount = fieldInfos.Count;
-                    float singleSoFieldBlockHeight = fieldCount * verticalSpacing;
-                    float centerY = y + singleSoFieldBlockHeight / 2f;
+                    float blockHeight = Mathf.Max(fieldCount, 1) * verticalSpacing;
+                    float centerY = yCursor + blockHeight / 2f;
 
                     var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xGroup, centerY - verticalSpacing / 2f), soId);
                     nodeMap[soId] = soNode;
                     AddElement(soNode);
 
-                    float singleFieldStartY = centerY - (singleSoFieldBlockHeight / 2f);
+                    float singleFieldStartY = centerY - blockHeight / 2f;
 
                     for (int i = 0; i < fieldCount; i++)
                     {
@@ -604,48 +597,35 @@ namespace ReaCS.Editor
                         Connect(soNode.outputContainer[0] as Port, fieldNode.inputContainer[0] as Port);
                     }
 
-                    y += Mathf.Max(fieldInfos.Count, 1) * verticalSpacing + 100;
+                    lastUsedY = yCursor + blockHeight;
+                    yCursor = lastUsedY;
                     continue;
                 }
 
-                var fieldNames = allTypeSOs
-                    .SelectMany(so => GetObservedFields(so))
-                    .Select(f => f.Name)
-                    .Distinct()
-                    .OrderBy(n => n)
-                    .ToList();
+                float groupHeight = allTypeSOs.Count * verticalSpacing;
+                float maxHeight = groupHeight;
+
+                float proxyY = yCursor + (maxHeight - verticalSpacing) / 2f;
 
                 string groupTypeName = soType.Name;
                 string groupKey = $"group:{groupTypeName}";
                 string proxyId = $"{groupKey}:proxy";
-
-                float groupHeight = allTypeSOs.Count * verticalSpacing;
-                float fieldBlockHeight = fieldNames.Count * verticalSpacing;
-                float maxHeight = Mathf.Max(groupHeight, fieldBlockHeight);
-
-                float fieldStartY = y + (maxHeight - fieldBlockHeight) / 2f;
-                float proxyY = y + (maxHeight - verticalSpacing) / 2f;
 
                 var proxyNode = CreateNode($"📦 {groupTypeName} (Group)", NodeType.SO, new Vector2(xProxy, proxyY), proxyId);
                 nodeMap[proxyId] = proxyNode;
                 AddElement(proxyNode);
 
                 var groupBox = new Group();
-                groupBox.SetPosition(new Rect(xGroup - 100f, y, 260, groupHeight + 40));
-
+                groupBox.SetPosition(new Rect(xGroup - 100f, yCursor, 260, groupHeight + 60f));
                 var titleLabel = new Label($"🧩 {groupTypeName} ({allTypeSOs.Count})");
                 titleLabel.AddToClassList("reaCS-group-title");
                 groupBox.Insert(0, titleLabel);
-
                 groupBox.AddToClassList("reaCS-group-box");
-
                 AddElement(groupBox);
 
-                // ✅ Skip entire group if none match
-                if (matchingSOs.Count == 0)
-                    continue;
+                float localY = yCursor;
+                float lastNodeYInGroup = yCursor;
 
-                float localY = y;
                 foreach (var so in matchingSOs)
                 {
                     var soNode = CreateNode($"🧩 {so.name}", NodeType.SO, new Vector2(xGroup + 20, localY), so.name);
@@ -658,141 +638,25 @@ namespace ReaCS.Editor
                     traceEdge.style.opacity = 0.3f;
                     traceEdge.style.borderBottomWidth = 0.5f;
 
+                    lastNodeYInGroup = localY;
                     localY += verticalSpacing;
-                }
-
-                var systemsPerField = new Dictionary<FieldReactionKey, List<Type>>();
-                foreach (var sysType in allSystemTypes)
-                {
-                    var attr = sysType.GetCustomAttribute<ReactToAttribute>();
-                    if (attr == null) continue;
-
-                    var baseSOType = sysType.BaseType?.GetGenericArguments()[0];
-                    if (baseSOType == null) continue;
-
-                    var key = new FieldReactionKey(attr.FieldName, baseSOType);
-
-                    if (!systemsPerField.TryGetValue(key, out var fieldList))
-                        systemsPerField[key] = fieldList = new List<Type>();
-
-                    fieldList.Add(sysType);
-                }
-
-                for (int i = 0; i < fieldNames.Count; i++)
-                {
-                    string fieldName = fieldNames[i];
-                    string fieldId = $"{groupKey}.{fieldName}";
-                    if (filter != null && !filter.Contains(fieldId)) continue;
-
-                    // ✅ Build typed key
-                    var key = new FieldReactionKey(fieldName, soType);
-
-                    // ✅ Lookup matching systems only for this field+type combo
-                    if (!systemsPerField.TryGetValue(key, out var fieldSystems))
-                        fieldSystems = new List<Type>();
-
-                    bool hasGroup = fieldSystems.Count > 1;
-                    bool hasSingleSystem = fieldSystems.Count == 1;
-
-                    float groupSysHeight = hasGroup ? fieldSystems.Count * verticalSpacing + 40f : 0f;
-                    float singleHeight = hasSingleSystem ? verticalSpacing : 0f;
-                    float fieldHeight = verticalSpacing;
-
-                    float blockHeight = Mathf.Max(groupSysHeight, singleHeight, fieldHeight);
-                    float blockPadding = 80f;
-                    float totalBlockHeight = blockHeight + blockPadding;
-
-                    float blockCenterY = fieldStartY + totalBlockHeight / 2f;
-
-                    var fieldNode = CreateNode($"🔸 {fieldName}", NodeType.Field, new Vector2(xField, blockCenterY), fieldId);
-                    nodeMap[fieldId] = fieldNode;
-                    AddElement(fieldNode);
-
-                    // We’ll use this at runtime to track the latest SO per field
-                    if (!fieldToSO.ContainsKey(fieldId))
-                        fieldToSO[fieldId] = $"<group:{groupTypeName}>"; // placeholder only
-
-                    // 🟡 Add dynamic field-to-focused-SO map if in focus mode
-                    if (!string.IsNullOrEmpty(currentFocusedSOName))
-                    {
-                        string focusedFieldId = $"{currentFocusedSOName}.{fieldName}";
-                        if (!fieldToSO.ContainsKey(focusedFieldId))
-                            fieldToSO[focusedFieldId] = currentFocusedSOName;
-                    }
-
-                    Connect(proxyNode.outputContainer[0] as Port, fieldNode.inputContainer[0] as Port);
-
-                    // ✅ Single system
-                    if (fieldSystems.Count == 1)
-                    {
-                        var sysType = fieldSystems[0];
-                        string sysId = sysType.Name;
-
-                        if (!nodeMap.TryGetValue(sysId, out var sysNode))
-                        {
-                            var systemNode = CreateNode($"🧪 {sysType.Name}", NodeType.System, new Vector2(xSystemGroup, blockCenterY), sysType.FullName);
-                            nodeMap[sysId] = systemNode;
-                            AddElement(systemNode);
-                            systemToSO[sysId] = allTypeSOs[0].name;
-                        }
-
-                        Connect(fieldNode.outputContainer[0] as Port, nodeMap[sysId].inputContainer[0] as Port);
-                    }
-                    else if (fieldSystems.Count > 1)
-                    {
-                        string sysGroupId = $"{groupKey}.{fieldName}.sysProxy";
-
-                        var proxySystemNode = CreateNode($"📦 Systems ({fieldName})", NodeType.System, new Vector2(xSystem, blockCenterY), sysGroupId);
-                        nodeMap[sysGroupId] = proxySystemNode;
-                        AddElement(proxySystemNode);
-                        Connect(fieldNode.outputContainer[0] as Port, proxySystemNode.inputContainer[0] as Port);
-
-                        var sysGroupBox = new Group();
-                        sysGroupBox.SetPosition(new Rect(xSystemGroup, blockCenterY - groupSysHeight / 2f, 260, groupSysHeight + 40));
-
-                        var label = new Label($"🧪 {fieldName} Systems ({fieldSystems.Count})");
-                        label.AddToClassList("reaCS-group-title");
-                        sysGroupBox.Insert(0, label);
-                        sysGroupBox.AddToClassList("reaCS-group-box");
-                        AddElement(sysGroupBox);
-
-                        float sysLocalY = blockCenterY - (fieldSystems.Count * verticalSpacing) / 2f;
-
-                        foreach (var sysType in fieldSystems)
-                        {
-                            string sysId = sysType.Name;
-
-                            if (!nodeMap.TryGetValue(sysId, out var sysNode))
-                            {
-                                sysNode = CreateNode($"🧪 {sysType.Name}", NodeType.System, new Vector2(xSystemGroup + 20, sysLocalY), sysType.FullName);
-                                nodeMap[sysId] = sysNode;
-                                AddElement(sysNode);
-                                systemToSO[sysId] = allTypeSOs[0].name;
-                            }
-
-                            sysGroupBox.AddElement(sysNode);
-                            var traceEdge = Connect(proxySystemNode.outputContainer[0] as Port, sysNode.inputContainer[0] as Port);
-                            traceEdge.pickingMode = PickingMode.Ignore;
-                            traceEdge.style.opacity = 0.3f;
-
-                            sysLocalY += verticalSpacing;
-                        }
-
-                        CenterSystemGroupToProxy(sysGroupId);
-                    }
-
-                    fieldStartY += totalBlockHeight;
                 }
 
                 CenterSOGroupToProxy(proxyId, groupKey, groupBox, allTypeSOs);
 
-
-
-                y += maxHeight + 140;
+                lastUsedY = Mathf.Max(lastUsedY, lastNodeYInGroup + verticalSpacing);
+                yCursor = lastUsedY;
             }
 
             UpdateFieldLabels();
         }
+
+
+
+
+
+
+
 
         private void CenterSOGroupToProxy(string proxyId, string groupKey, Group groupBox, List<ObservableScriptableObject> allTypeSOs)
         {

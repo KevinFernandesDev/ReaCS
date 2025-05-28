@@ -5,7 +5,7 @@ using System;
 using System.Reflection;
 using System.Collections.Generic;
 using ReaCS.Runtime.Core;
-using static ReaCS.Runtime.ReaCS;
+using static ReaCS.Runtime.Access;
 using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Editor

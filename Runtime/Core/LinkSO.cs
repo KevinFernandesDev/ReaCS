@@ -1,5 +1,5 @@
 ﻿using ReaCS.Runtime.Registries;
-using static ReaCS.Runtime.ReaCS;
+using static ReaCS.Runtime.Access;
 
 namespace ReaCS.Runtime.Core
 {

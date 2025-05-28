@@ -1,4 +1,4 @@
-﻿using static ReaCS.Runtime.ReaCS;
+﻿using static ReaCS.Runtime.Access;
 using ReaCS.Runtime.Registries;
 using ReaCS.Runtime.Services;
 using UnityEngine;
@@ -62,7 +62,7 @@ namespace ReaCS.Runtime.Core
                 withId.entityId.Value = sharedId;
 
             Use<ComponentDataBindingService<TSO>>().Register(data, this);
-            Query<ReaCSIndexRegistry>().Register(data);         
+            Query<IndexRegistry>().Register(data);         
 
             initialized = true;
         }
@@ -74,7 +74,7 @@ namespace ReaCS.Runtime.Core
             if (data == null) return;
 
             Use<ComponentDataBindingService<TSO>>().Unregister(data);
-            Query<ReaCSIndexRegistry>().Unregister(data);
+            Query<IndexRegistry>().Unregister(data);
 
             if (data != dataSource || useAsTemplate || dataSource == null)
             {

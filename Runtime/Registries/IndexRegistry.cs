@@ -7,7 +7,7 @@ using UnityEngine;
 
 namespace ReaCS.Runtime.Registries
 {
-    public class ReaCSIndexRegistry : IReaCSQuery
+    public class IndexRegistry : IReaCSQuery
     {
         private readonly Dictionary<Type, List<ObservableScriptableObject>> activeByType = new();
         private readonly List<ScriptableObject> allLinks = new();
