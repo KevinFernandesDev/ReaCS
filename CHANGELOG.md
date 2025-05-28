@@ -1,5 +1,33 @@
 # 📦 Changelog
 
+## [1.1.2] - 2025-05-28
+
+### Added
+- **Execution Trace Graph** window:
+  - Visualizes runtime propagation chains: System ➝ Field ➝ System ➝ ...
+  - Each node shows SO name, field name, and old ➝ new value
+  - Strict left-to-right layout with vertical fan-out for fields
+  - Causal flow tracking from runtime history system
+  - Custom edge and node styling, including source indicators (e.g. 🧩 for external triggers)
+  - Hover previews for system code
+- **Syntax highlighting** for system previews:
+  - Visual Studio-like color palette
+  - Supports keywords, types, methods, numbers, properties, symbols
+  - Preserves spacing and formatting exactly using `WhiteSpace.Pre`
+  - Detects `nameof(...)` patterns and colors inner content
+  - Tracks and highlights inside `${}` interpolated expressions recursively
+
+### Fixed
+- `Label` rendering collapsed multiple spaces; fixed using `whiteSpace = WhiteSpace.Pre`
+- Misclassification of capitalized properties like `Value` as types
+- Strings with `${}` were previously unstyled; now parsed and highlighted correctly
+
+### Changed
+- Visual system nodes now include hoverable code previews with syntax color
+- `CreateTokenLabel()` uses strict layout styling to match source format
+
+
+
 ## [1.1.1] – 2025-05-26 — Link Tree Graph & LinkSO/ObservableScriptableObject Visualization
 
 ### ✨ Added
@@ -41,6 +69,7 @@
 * ♻ The root node is no longer overridden or skipped during recursive expansion.
 * 🎯 `PingObject` now works correctly for all node types and expansion states.
 * 🎨 Nodes are placed consistently and logically with vertical spacing depending on number of links.
+
 
 
 ##  [1.1.0] 26/05/2025 — Entity-Based Binding Overhaul

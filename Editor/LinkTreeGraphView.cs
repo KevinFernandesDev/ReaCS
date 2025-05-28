@@ -71,7 +71,7 @@ namespace ReaCS.Editor
             schedule.Execute(() =>
             {
                 FrameGraphToCenter();
-            }).ExecuteLater(10);
+            }).ExecuteLater(100);
         }
 
         private void TraverseAll(ObservableScriptableObject root, Node rootNode)
