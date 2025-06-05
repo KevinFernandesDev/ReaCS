@@ -6,7 +6,7 @@ using UnityEngine;
 namespace ReaCS.Runtime.Core
 {
     /// <summary>
-    /// Runtime binding between a GameObject and its ObservableScriptableObject component.
+    /// Runtime binding between a GameObject and its ObservableScriptableObject component and UnityComponent.
     /// </summary>
     public abstract class ComponentDataBinding : MonoBehaviour
     {
@@ -14,11 +14,21 @@ namespace ReaCS.Runtime.Core
     }
 
     /// <summary>
-    /// Generic binding to either a shared or pooled instance of TSO.
-    /// A single field is used, and a toggle determines if it's used as a template or directly.
+    /// Base class used internally by ComponentDataBindingService for data-only access.
     /// </summary>
-    public abstract class ComponentDataBinding<TSO> : ComponentDataBinding, IHasDataSource<TSO>
+    public abstract class ComponentDataBinding<TSO> : ComponentDataBinding
+        where TSO : ObservableScriptableObject
+    {
+        public abstract TSO data { get; set; }
+    }
+
+
+    /// <summary>
+    /// Generic binding to a data source of type TSO and a required Unity Component TUC.
+    /// </summary>
+    public abstract class ComponentDataBinding<TSO, TUC> : ComponentDataBinding<TSO>, IHasDataSource<TSO>
         where TSO : ObservableScriptableObject, new()
+        where TUC : Component
     {
         [SerializeField] private TSO dataSource;
         [SerializeField] private bool useAsTemplate = false;
@@ -26,8 +36,8 @@ namespace ReaCS.Runtime.Core
         public TSO DataSource => dataSource;
         public bool UseAsTemplate => useAsTemplate;
 
-        public TSO data { get; private set; }
-
+        public override TSO data { get; set; }
+        public TUC uc { get; private set; }
 
         private bool initialized;
 
@@ -35,6 +45,7 @@ namespace ReaCS.Runtime.Core
         {
             if (initialized) return;
 
+            uc = GetComponent<TUC>();
             int sharedId = Use<SharedEntityIdService>().GetOrAssignEntityId(transform);
 
             if (dataSource != null)
@@ -52,17 +63,15 @@ namespace ReaCS.Runtime.Core
             }
             else
             {
-                // Fallback: blank pooled instance
                 data = Use<PoolService<TSO>>().Get();
                 data.name = $"Unnamed_{typeof(TSO).Name}_Runtime_{GetInstanceID()}";
             }
 
-            // Assign shared EntityId if supported
             if (data is IHasEntityId withId)
                 withId.entityId.Value = sharedId;
 
             Use<ComponentDataBindingService<TSO>>().Register(data, this);
-            Query<IndexRegistry>().Register(data);         
+            Query<IndexRegistry>().Register(data);
 
             initialized = true;
         }
