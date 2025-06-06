@@ -19,13 +19,10 @@ namespace ReaCS.Editor
 
             if (state == PlayModeStateChange.ExitingEditMode)
             {
+                Debug.Log("[ObservableStateDispatcher] Saving state before play.");
+
                 foreach (var so in allSOs)
                     so.SaveStateToJson();
-            }
-            else if (state == PlayModeStateChange.EnteredEditMode)
-            {
-                foreach (var so in allSOs)
-                    so.LoadStateFromJson();
             }
 
             if (state == PlayModeStateChange.EnteredPlayMode || state == PlayModeStateChange.EnteredEditMode)

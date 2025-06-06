@@ -34,4 +34,8 @@ namespace ReaCS.Runtime.Core
     {
         void Init(ObservableScriptableObject owner, string fieldName);
     }
+    public interface ILinkResettable
+    {
+        void ClearLink();
+    }
 }

@@ -1,4 +1,5 @@
 using System;
+using UnityEngine;
 
 namespace ReaCS.Runtime.Core
 {
@@ -16,6 +17,16 @@ namespace ReaCS.Runtime.Core
         public ReactToAttribute(string fieldName)
         {
             FieldName = fieldName;
+        }
+    }
+
+    public class ObservableRangeAttribute : PropertyAttribute
+    {
+        public float min, max;
+        public ObservableRangeAttribute(float min, float max)
+        {
+            this.min = min;
+            this.max = max;
         }
     }
 }

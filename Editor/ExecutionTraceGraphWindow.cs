@@ -10,11 +10,11 @@ namespace ReaCS.Editor
     {
         private ExecutionTraceGraphView graphView;
 
-        [MenuItem("ReaCS/Runtime Execution Trace Graph")]
+        [MenuItem("ReaCS/Execution Trace Graph")]
         public static void ShowWindow()
         {
             var window = GetWindow<ExecutionTraceGraphWindow>();
-            window.titleContent = new GUIContent("Runtime Execution Trace");
+            window.titleContent = new GUIContent("Execution Trace");
             window.Show();
         }
 

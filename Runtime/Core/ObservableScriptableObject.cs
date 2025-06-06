@@ -7,14 +7,20 @@ using System.Reflection;
 using UnityEngine;
 using static ReaCS.Runtime.Access;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 namespace ReaCS.Runtime.Core
 {
-    public abstract class ObservableScriptableObject : ScriptableObject
+    public abstract class ObservableScriptableObject : ScriptableObject, IHasEntityId
     {
+        public Observable<int> entityId = new();
+        Observable<int> IHasEntityId.entityId => entityId;
+
         public event Action<ObservableScriptableObject, string> OnChanged;
 
         private static readonly Dictionary<Type, List<CachedFieldInfo>> _fieldCache = new();
-
         private List<CachedFieldInfo> _observedFields;
         private Dictionary<string, object> _cachedValues = new();
 
@@ -27,10 +33,14 @@ namespace ReaCS.Runtime.Core
             ObservableRuntimeWatcher.Register(this);
             Query<IndexRegistry>().Register(this);
 
-
             InitializeFields();
 
-#if !UNITY_EDITOR
+#if UNITY_EDITOR
+            EditorApplication.delayCall += () =>
+            {
+                if (this) LoadStateFromJson(); // ensure this hasn't been destroyed
+            };
+#else
             LoadStateFromJson();
 #endif
         }
@@ -41,7 +51,9 @@ namespace ReaCS.Runtime.Core
             ObservableRuntimeWatcher.Unregister(this);
             Query<IndexRegistry>().Unregister(this);
 
-#if !UNITY_EDITOR
+#if UNITY_EDITOR
+            // Only save if exiting Play Mode, handled by dispatcher
+#else
             SaveStateToJson();
 #endif
         }
@@ -50,6 +62,18 @@ namespace ReaCS.Runtime.Core
         protected virtual void OnValidate()
         {
             CheckForChanges();
+
+            var fields = GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            foreach (var field in fields)
+            {
+                if (field.FieldType.IsGenericType &&
+                    field.FieldType.GetGenericTypeDefinition() == typeof(Observable<>))
+                {
+                    var observable = field.GetValue(this);
+                    var syncMethod = field.FieldType.GetMethod("EditorSyncFromInspector");
+                    syncMethod?.Invoke(observable, null);
+                }
+            }
         }
 #endif
 
@@ -172,11 +196,10 @@ namespace ReaCS.Runtime.Core
                 bool shouldPersist = cached.ShouldPersistField != null && (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
 
 #if UNITY_EDITOR
-                if (shouldPersist) continue;
-#else
                 if (!shouldPersist) continue;
+#else
+if (!shouldPersist) continue;
 #endif
-
                 var value = cached.ValueProperty?.GetValue(sourceObs);
                 cached.ValueProperty?.SetValue(targetObs, value);
             }

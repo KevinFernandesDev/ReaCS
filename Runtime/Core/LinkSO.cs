@@ -9,7 +9,7 @@ namespace ReaCS.Runtime.Core
         public abstract ObservableScriptableObject Right { get; }
     }
 
-    public class LinkSO<TLeft, TRight> : LinkSO
+    public class LinkSO<TLeft, TRight> : LinkSO, ILinkResettable
     where TLeft : ObservableScriptableObject
     where TRight : ObservableScriptableObject
     {
@@ -19,6 +19,13 @@ namespace ReaCS.Runtime.Core
 
         public override ObservableScriptableObject Left => LeftSO.Value;
         public override ObservableScriptableObject Right => RightSO.Value;
+
+        public void ClearLink()
+        {
+            LeftSO.Value = null;
+            RightSO.Value = null;
+        }
+
 
 #if UNITY_EDITOR
         protected override void OnEnable()

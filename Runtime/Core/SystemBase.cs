@@ -14,8 +14,9 @@ namespace ReaCS.Runtime.Core
         // Utility: active scene check for runtime filtering
         private bool IsInActiveScene()
         {
-            return gameObject.scene.IsValid() && gameObject.activeInHierarchy;
+            return this != null && gameObject != null && gameObject.scene.IsValid() && gameObject.activeInHierarchy;
         }
+
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void ReconnectSystems()
@@ -29,12 +30,22 @@ namespace ReaCS.Runtime.Core
 #if UNITY_EDITOR
         protected virtual void OnEnable()
         {
-            if (Application.isPlaying) return; // Ignore during playmode
+            //Debug.Log($"[ReaCS][Editor] {GetType().Name} OnEnable triggered. isPlaying: {Application.isPlaying}");
+
+            // Always run this in Editor for Graph support
+
             _observedField = ResolveObservedField();
+            //Debug.Log($"[ReaCS] {GetType().Name} registering to observe field: {_observedField}");
+            if (string.IsNullOrEmpty(_observedField))
+            {
+                //Debug.LogWarning($"[ReaCS] {GetType().Name} is missing a valid [ReactTo] attribute.");
+            }
 
             ObservableRegistry.OnRegistered += HandleNewSO;
             ObservableRegistry.OnUnregistered += HandleRemovedSO;
         }
+
+
 
         protected virtual void OnDisable()
         {
@@ -96,7 +107,7 @@ namespace ReaCS.Runtime.Core
         private void HandleRemovedSO(ObservableScriptableObject so)
         {
             if (!Application.isPlaying) return;
-            if (!IsInActiveScene()) return;
+            if (this == null || !IsInActiveScene()) return;
 
             if (so is TSO typed && IsTarget(typed))
             {
@@ -104,6 +115,7 @@ namespace ReaCS.Runtime.Core
                 ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from {typed.name}.{_observedField} (removed)");
             }
         }
+
 
         private void SubscribeAll()
         {
@@ -145,7 +157,7 @@ namespace ReaCS.Runtime.Core
             if (fieldName == _observedField)
             {
                 ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
-                Debug.Log($"[SystemBase] Matching field! Pushing system context: {GetType().Name}");
+                ReaCSDebug.Log($"[SystemBase] Matching field! Pushing system context: {GetType().Name}");
                 SystemContext.WithSystem(GetType().Name, () => OnFieldChanged((TSO)so));
             }
         }
@@ -156,7 +168,23 @@ namespace ReaCS.Runtime.Core
         private string ResolveObservedField()
         {
             var attr = GetType().GetCustomAttribute<ReactToAttribute>();
-            return attr?.FieldName;
+            if (attr == null)
+            {
+                ReaCSDebug.LogWarning($"[ReaCS] {GetType().Name} is missing [ReactTo] attribute.");
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(attr.FieldName))
+            {
+                ReaCSDebug.LogWarning($"[ReaCS] {GetType().Name} has an empty field name in [ReactTo] attribute.");
+            }
+            else
+            {
+                ReaCSDebug.Log($"[ReaCS] {GetType().Name} is observing field: {attr.FieldName}");
+            }
+
+            return attr.FieldName;
         }
+
     }
 }

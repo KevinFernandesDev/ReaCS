@@ -1,4 +1,6 @@
+using static ReaCS.Runtime.Access;
 using ReaCS.Runtime.Core;
+using ReaCS.Runtime.Registries;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -10,11 +12,22 @@ namespace ReaCS.Runtime.Services
 
         public T Get()
         {
-            return _pool.Count > 0 ? _pool.Pop() : ScriptableObject.CreateInstance<T>();
+            var instance = _pool.Count > 0
+                ? _pool.Pop()
+                : ScriptableObject.CreateInstance<T>();
+
+            // Auto-register with IndexRegistry
+            Query<IndexRegistry>().Register(instance);
+            return instance;
         }
 
         public void Release(T instance)
         {
+            Query<IndexRegistry>().Unregister(instance);
+
+            if (instance is ILinkResettable resettable)
+                resettable.ClearLink();
+
             _pool.Push(instance);
         }
 
@@ -24,5 +37,17 @@ namespace ReaCS.Runtime.Services
         }
 
         public int Count => _pool.Count;
+
+        // Optional helper for links
+        public TLink Get<TLink, TLeft, TRight>(TLeft left, TRight right)
+            where TLink : LinkSO<TLeft, TRight>, T
+            where TLeft : ObservableScriptableObject
+            where TRight : ObservableScriptableObject
+        {
+            var link = Get() as TLink;
+            link.LeftSO.Value = left;
+            link.RightSO.Value = right;
+            return link;
+        }
     }
 }
