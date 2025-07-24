@@ -1,6 +1,7 @@
 using ReaCS.Runtime.Internal;
 using System;
 using Unity.Collections;
+using Unity.Properties;
 using UnityEngine;
 
 namespace ReaCS.Runtime.Core
@@ -9,7 +10,6 @@ namespace ReaCS.Runtime.Core
     public class Observable<T> : IInitializableObservable
     {
         [SerializeField] public bool ShouldPersist = false;
-        //[SerializeField] public T value;
 
         [NonSerialized] private ObservableScriptableObject owner;
         [NonSerialized] private string fieldName;
@@ -37,6 +37,7 @@ namespace ReaCS.Runtime.Core
             this.fieldName = fieldName;
         }
 
+        [CreateProperty]
         public T Value
         {
             get => _value;
