@@ -28,7 +28,7 @@ namespace ReaCS.Runtime
 #endif
         }
 
-        public IEnumerable<T> GetByEntity<T>(EntityId entityId) where T : ObservableScriptableObject, new()
+        public IEnumerable<T> GetByEntity<T>(int entityId) where T : ObservableScriptableObject, new()
         {
             var bindings = Use<ComponentDataBindingService<T>>().GetAllForEntity(entityId);
             for (int i = 0; i < bindings.Count; i++)
