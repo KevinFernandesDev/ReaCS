@@ -16,38 +16,59 @@ namespace ReaCS.Runtime.Core
         private static Dictionary<ObservableScriptableObject, int> _objectToId = new();
         private static List<ObservableScriptableObject> _idToObject = new();
 
-        private static NativeList<int> _debouncedIds;
-        private static NativeHashMap<int, float> _debounceTimers;
-        private static NativeList<int> _readyToUpdate;
+        // ✅ Event-driven dirty fields
+        private static List<(int, string)> _dirtyFields = new(256);
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-
-        private static void ResetStatics()
-        {
-            _objectToId.Clear();
-            _idToObject.Clear();
-
-            if (_debouncedIds.IsCreated) _debouncedIds.Dispose();
-            if (_debounceTimers.IsCreated) _debounceTimers.Dispose();
-            if (_readyToUpdate.IsCreated) _readyToUpdate.Dispose();
-
-            _debouncedIds = new NativeList<int>(100, Allocator.Persistent);
-            _debounceTimers = new NativeHashMap<int, float>(100, Allocator.Persistent);
-            _readyToUpdate = new NativeList<int>(100, Allocator.Persistent); 
-            
-            Debug.Log("[ReaCS] ResetStatics called");
-
-        }
+        // ✅ HighFrequency Burst job data
+        private static NativeArray<float> _previousHashes;
+        private static NativeArray<float> _currentHashes;
+        private static NativeArray<byte> _dirtyFlags;
+        private static int _capacity = 1024;
+        private static int _registeredCount = 0;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         internal static void Init()
         {
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#endif
             if (_isInitialized) return;
+
             if (_instance == null)
             {
                 var go = new GameObject("ObservableRuntimeWatcher");
                 _instance = go.AddComponent<ObservableRuntimeWatcher>();
                 DontDestroyOnLoad(go);
+            }
+
+            if (!_previousHashes.IsCreated)
+                AllocateNativeArrays(_capacity);
+
+            _isInitialized = true;
+        }
+
+
+        private static void AllocateNativeArrays(int newSize)
+        {
+            var oldPrev = _previousHashes;
+            var oldCurr = _currentHashes;
+            var oldDirty = _dirtyFlags;
+
+            int oldCount = oldPrev.IsCreated ? oldPrev.Length : 0;
+
+            _previousHashes = new NativeArray<float>(newSize, Allocator.Persistent);
+            _currentHashes = new NativeArray<float>(newSize, Allocator.Persistent);
+            _dirtyFlags = new NativeArray<byte>(newSize, Allocator.Persistent);
+
+            if (oldCount > 0)
+            {
+                NativeArray<float>.Copy(oldPrev, _previousHashes, oldCount);
+                NativeArray<float>.Copy(oldCurr, _currentHashes, oldCount);
+                NativeArray<byte>.Copy(oldDirty, _dirtyFlags, oldCount);
+
+                oldPrev.Dispose();
+                oldCurr.Dispose();
+                oldDirty.Dispose();
             }
         }
 
@@ -56,147 +77,163 @@ namespace ReaCS.Runtime.Core
 #if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
 #else
-            if (!Application.isPlaying) return;
+    if (!Application.isPlaying) return;
 #endif
+            if (!_isInitialized) Init();
             if (_objectToId.ContainsKey(so)) return;
 
-            int id = _idToObject.Count;
+            int id = _registeredCount;
             _objectToId[so] = id;
             _idToObject.Add(so);
+            _registeredCount++;
+
+            // ✅ Ensure arrays are allocated before use
+            if (!_previousHashes.IsCreated || id >= _previousHashes.Length)
+            {
+                _capacity = Mathf.Max(_capacity * 2, id + 1);
+                AllocateNativeArrays(_capacity);
+            }
+
+            float hash = so.updateMode == UpdateMode.HighFrequency ? so.ComputeFastHash() : 0f;
+            _previousHashes[id] = hash;
+            _currentHashes[id] = hash;
+            _dirtyFlags[id] = 0;
         }
+
 
         public static void Unregister(ObservableScriptableObject so)
         {
-            if (_objectToId.TryGetValue(so, out int id))
+            if (!_objectToId.TryGetValue(so, out int id)) return;
+
+            _objectToId.Remove(so);
+            if (id < _idToObject.Count)
+                _idToObject[id] = null;
+
+            for (int i = _dirtyFields.Count - 1; i >= 0; i--)
             {
-                _objectToId.Remove(so);
+                if (_dirtyFields[i].Item1 == id)
+                    _dirtyFields.RemoveAt(i);
+            }
 
-                if (_debounceTimers.IsCreated && _debounceTimers.ContainsKey(id))
-                    _debounceTimers.Remove(id);
-
-                if (_debouncedIds.IsCreated)
-                    RemoveId(_debouncedIds, id);
-
-                if (_readyToUpdate.IsCreated)
-                    RemoveId(_readyToUpdate, id);
+            if (_previousHashes.IsCreated && id < _previousHashes.Length)
+            {
+                _previousHashes[id] = 0f;
+                _currentHashes[id] = 0f;
+                _dirtyFlags[id] = 0;
             }
         }
 
-
-        private static void RemoveId(NativeList<int> list, int id)
-        {
-            for (int i = 0; i < list.Length; i++)
-            {
-                if (list[i] == id)
-                {
-                    list.RemoveAtSwapBack(i);
-                    return;
-                }
-            }
-        }
-
-        public static void DebounceChange(ObservableScriptableObject so, float delay)
+        public static void NotifyDirty(ObservableScriptableObject so, string fieldName)
         {
             if (!_objectToId.TryGetValue(so, out int id)) return;
 
-            if (!_debouncedIds.Contains(id))
-                _debouncedIds.Add(id);
-
-            _debounceTimers[id] = delay;
+            for (int i = 0; i < _dirtyFields.Count; i++)
+            {
+                if (_dirtyFields[i].Item1 == id && _dirtyFields[i].Item2 == fieldName)
+                    return;
+            }
+            _dirtyFields.Add((id, fieldName));
         }
 
         [BurstCompile]
-        private struct TickDebounceJob : IJob
+        private struct CheckChangesJob : IJobParallelFor
         {
-            public float DeltaTime;
-            public NativeList<int> DebouncedIds;
-            public NativeHashMap<int, float> Timers;
-            public NativeList<int> ReadyIds;
+            [ReadOnly] public NativeArray<float> Previous;
+            [ReadOnly] public NativeArray<float> Current;
+            public NativeArray<byte> DirtyFlags;
 
-            public void Execute()
+            public void Execute(int index)
             {
-                for (int i = 0; i < DebouncedIds.Length; i++)
-                {
-                    int id = DebouncedIds[i];
-                    if (!Timers.TryGetValue(id, out float time)) continue;
-
-                    time -= DeltaTime;
-                    if (time <= 0f)
-                    {
-                        ReadyIds.Add(id);
-                        Timers.Remove(id);
-                        DebouncedIds.RemoveAtSwapBack(i);
-                        i--; // Adjust index due to swap
-                    }
-                    else
-                    {
-                        Timers[id] = time;
-                    }
-                }
+                DirtyFlags[index] = (Previous[index] != Current[index]) ? (byte)1 : (byte)0;
             }
-        }
-
-        private void Awake()
-        {
-            if (!_isInitialized) return;
-            if (!_debouncedIds.IsCreated)
-                _debouncedIds = new NativeList<int>(100, Allocator.Persistent);
-            if (!_debounceTimers.IsCreated)
-                _debounceTimers = new NativeHashMap<int, float>(100, Allocator.Persistent);
-            if (!_readyToUpdate.IsCreated)
-                _readyToUpdate = new NativeList<int>(100, Allocator.Persistent);
         }
 
         private void Update()
         {
-            if (!_debouncedIds.IsCreated || _debouncedIds.Length == 0)
-                return;
+#if UNITY_EDITOR
+            if (!Application.isPlaying) return;
+#endif
+            if (_registeredCount == 0) return;
 
-            var job = new TickDebounceJob
+            // ✅ Process Event-Driven Dirty Fields
+            for (int i = 0; i < _dirtyFields.Count; i++)
             {
-                DeltaTime = Time.deltaTime,
-                DebouncedIds = _debouncedIds,
-                Timers = _debounceTimers,
-                ReadyIds = _readyToUpdate
-            };
+                int soId = _dirtyFields[i].Item1;
+                string fieldName = _dirtyFields[i].Item2;
 
-            job.Run();
-
-            for (int i = 0; i < _readyToUpdate.Length; i++)
-            {
-                int id = _readyToUpdate[i];
-                if (id >= 0 && id < _idToObject.Count)
+                if (soId >= 0 && soId < _idToObject.Count)
                 {
-                    var so = _idToObject[id];
-                    so?.CheckForChanges();
+                    var so = _idToObject[soId];
+                    so?.ProcessFieldChange(fieldName);
+                }
+            }
+            _dirtyFields.Clear();
+
+            // ✅ Update hashes only for HighFrequency SOs
+            for (int i = 0; i < _registeredCount; i++)
+            {
+                var so = _idToObject[i];
+                if (so == null || so.updateMode != UpdateMode.HighFrequency)
+                {
+                    _currentHashes[i] = _previousHashes[i];
+                    continue;
+                }
+
+                try
+                {
+                    _currentHashes[i] = so.ComputeFastHash();
+                }
+                catch
+                {
+                    _currentHashes[i] = 0f;
                 }
             }
 
-            _readyToUpdate.Clear();
+            // ✅ Run Burst Parallel Job
+            var job = new CheckChangesJob
+            {
+                Previous = _previousHashes,
+                Current = _currentHashes,
+                DirtyFlags = _dirtyFlags
+            };
+            job.Schedule(_registeredCount, 64).Complete();
+
+            // ✅ Apply Changes for Dirty HighFrequency SOs
+            for (int i = 0; i < _registeredCount; i++)
+            {
+                if (_dirtyFlags[i] == 1)
+                {
+                    var so = _idToObject[i];
+                    if (so != null)
+                        so.ProcessAllFields();
+
+                    _previousHashes[i] = _currentHashes[i];
+                    _dirtyFlags[i] = 0;
+                }
+            }
         }
 
         private void OnDestroy()
         {
-            if (_debouncedIds.IsCreated) _debouncedIds.Dispose();
-            if (_debounceTimers.IsCreated) _debounceTimers.Dispose();
-            if (_readyToUpdate.IsCreated) _readyToUpdate.Dispose();
+            if (_previousHashes.IsCreated) _previousHashes.Dispose();
+            if (_currentHashes.IsCreated) _currentHashes.Dispose();
+            if (_dirtyFlags.IsCreated) _dirtyFlags.Dispose();
+
+            _isInitialized = false;
+            _objectToId.Clear();
+            _idToObject.Clear();
+            _dirtyFields.Clear();
+            _registeredCount = 0;
         }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        public static void ForceUpdate()
+        public static void ForceUpdateAll()
         {
-            foreach (var pair in _objectToId)
+            for (int i = 0; i < _idToObject.Count; i++)
             {
-                pair.Key?.CheckForChanges();
-            }
-        }
-#endif
-#if UNITY_EDITOR
-        public static void MarkAllDirty()
-        {
-            foreach (var pair in _objectToId)
-            {
-                pair.Key?.MarkDirty("TestDirtyAll");
+                var so = _idToObject[i];
+                if (so == null) continue;
+                so.ProcessAllFields();
             }
         }
 #endif

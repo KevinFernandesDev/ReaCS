@@ -1,5 +1,4 @@
 ﻿using NUnit.Framework;
-using ReaCS.Runtime;
 using ReaCS.Runtime.Core;
 using ReaCS.Tests.Shared;
 using System.Collections;
@@ -13,14 +12,12 @@ namespace ReaCS.Tests.Runtime
         [UnityTest]
         public IEnumerator RuntimeWatcher_Initializes_OnLoad()
         {
-            // Cleanup any existing instance first
             var existing = GameObject.Find("ObservableRuntimeWatcher");
             if (existing != null)
                 Object.DestroyImmediate(existing);
 
-            yield return null; // Let destruction happen
+            yield return null;
 
-            // Trigger init
             typeof(ObservableRuntimeWatcher)
                 .GetMethod("Init", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)
                 ?.Invoke(null, null);
@@ -28,18 +25,14 @@ namespace ReaCS.Tests.Runtime
             yield return null;
 
             var watcherGO = GameObject.Find("ObservableRuntimeWatcher");
-            Assert.IsNotNull(watcherGO, "Watcher GameObject should exist");
-            Assert.IsNotNull(watcherGO.GetComponent<ObservableRuntimeWatcher>(), "Watcher component should be present");
-
-            Object.Destroy(watcherGO); // Clean up after test
+            Assert.IsNotNull(watcherGO);
+            Assert.IsNotNull(watcherGO.GetComponent<ObservableRuntimeWatcher>());
         }
 
-
         [UnityTest]
-        public IEnumerator Registers_And_Updates_SO()
+        public IEnumerator SO_Change_Triggers_OnChanged_After_Update()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_Registers_And_Updates";
             so.ForceInitializeForTest();
 
             bool triggered = false;
@@ -49,55 +42,17 @@ namespace ReaCS.Tests.Runtime
             };
 
             ObservableRuntimeWatcher.Register(so);
-            so.number.Value = 5;
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
+
+            so.number.Value = 42;
+            yield return null; // let Update run
 
             Assert.IsTrue(triggered);
         }
 
         [UnityTest]
-        public IEnumerator Debounce_Does_Not_Update_Immediately()
+        public IEnumerator Unregister_SO_Stops_Further_Updates()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_Debounce_Does_Not_Update_Immediately";
-            so.ForceInitializeForTest();
-            ObservableRuntimeWatcher.Register(so);
-
-            bool triggered = false;
-            so.OnChanged += (_, __) => triggered = true;
-
-            so.number.Value = 88;
-            ObservableRuntimeWatcher.DebounceChange(so, 1f);
-
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
-
-            Assert.IsFalse(triggered);
-        }
-
-        [UnityTest]
-        public IEnumerator Debounce_Overwrites_Previous_Delay()
-        {
-            var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "DebounceOverwrite";
-            so.ForceInitializeForTest();
-
-            ObservableRuntimeWatcher.Register(so);
-            ObservableRuntimeWatcher.DebounceChange(so, 2f);
-            ObservableRuntimeWatcher.DebounceChange(so, 0.1f); // should overwrite
-
-            yield return new WaitForSeconds(0.2f);
-            ObservableRuntimeWatcher.ForceUpdate();
-
-            Assert.Pass("Debounce resolved correctly");
-        }
-
-        [UnityTest]
-        public IEnumerator Unregister_SO_Stops_Updates()
-        {
-            var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "UnregisterSO";
             so.ForceInitializeForTest();
 
             bool changed = false;
@@ -107,70 +62,9 @@ namespace ReaCS.Tests.Runtime
             ObservableRuntimeWatcher.Unregister(so);
 
             so.number.Value = 7;
-            ObservableRuntimeWatcher.ForceUpdate();
+            yield return null; // let Update run
 
-            yield return null;
-            Assert.IsFalse(changed);
-        }
-
-        [UnityTest]
-        public IEnumerator Debounce_Clears_After_Duration()
-        {
-            var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "DebounceExpire";
-            so.ForceInitializeForTest();
-
-            ObservableRuntimeWatcher.Register(so);
-            ObservableRuntimeWatcher.DebounceChange(so, 0.1f);
-
-            yield return new WaitForSeconds(0.2f);
-            ObservableRuntimeWatcher.ForceUpdate();
-
-            Assert.Pass("Debounce cleared");
-        }
-
-        [UnityTest]
-        public IEnumerator Debounced_Observable_Is_Checked_After_Delay()
-        {
-            var so = ScriptableObject.CreateInstance<DebounceTestSO>();
-            so.ForceInitializeForTest();
-
-            bool wasTriggered = false;
-            so.OnTestChanged += () => wasTriggered = true;
-
-            ObservableRuntimeWatcher.Register(so);
-            so.TriggerChange(42); // change and dirty it
-            ObservableRuntimeWatcher.DebounceChange(so, 0.1f);
-
-            float elapsed = 0f;
-            while (elapsed < 0.2f)
-            {
-                elapsed += Time.deltaTime;
-                yield return null;
-            }
-
-            Assert.IsTrue(wasTriggered, "Debounced SO should have triggered OnChanged after delay.");
-        }
-
-        [UnityTest]
-        public IEnumerator Init_Creates_RuntimeWatcher_Instance()
-        {
-            // Destroy manually if present
-            var existing = GameObject.Find("ObservableRuntimeWatcher");
-            if (existing != null)
-                Object.Destroy(existing);
-
-            yield return null;
-
-            var initMethod = typeof(ObservableRuntimeWatcher)
-                .GetMethod("Init", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
-            initMethod?.Invoke(null, null);
-
-            yield return null;
-
-            var go = GameObject.Find("ObservableRuntimeWatcher");
-            Assert.IsNotNull(go, "Runtime watcher GameObject should exist.");
-            Assert.IsNotNull(go.GetComponent<ObservableRuntimeWatcher>(), "Watcher component should be present.");
+            Assert.IsFalse(changed, "Unregistered SO should not trigger OnChanged.");
         }
     }
 }

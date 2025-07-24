@@ -151,7 +151,7 @@ namespace ReaCS.Runtime.Core
 
         private void HandleChange(ObservableScriptableObject so, string fieldName)
         {
-            Debug.Log($"[SystemBase] {GetType().Name} handling change for {fieldName}");
+            ReaCSDebug.Log($"[SystemBase] {GetType().Name} handling change for {fieldName}");
             if (!Application.isPlaying) return;
 
             if (fieldName == _observedField)

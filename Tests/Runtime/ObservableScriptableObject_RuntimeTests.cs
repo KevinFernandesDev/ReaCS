@@ -1,11 +1,7 @@
 ﻿using NUnit.Framework;
-using ReaCS.Runtime;
 using ReaCS.Runtime.Core;
-using ReaCS.Runtime.Internal;
 using ReaCS.Tests.Shared;
 using System.Collections;
-using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.TestTools;
 
@@ -21,156 +17,113 @@ namespace ReaCS.Tests.Runtime
             so.ForceInitializeForTest();
 
             ObservableRuntimeWatcher.Register(so);
-            ScriptableObject.DestroyImmediate(so); // Simulates OnDisable
+
+            // Simulate destruction
+            ScriptableObject.DestroyImmediate(so);
+            yield return null; // Let Update tick
+
+            // Changing after destruction should not trigger
+            bool triggered = false;
+            so.OnChanged += (_, __) => triggered = true;
 
             yield return null;
-            ObservableRuntimeWatcher.ForceUpdate(); // Should not process destroyed SO
-
-            Assert.Pass("SO successfully unregistered on disable");
+            Assert.IsFalse(triggered, "SO should unregister on disable.");
         }
 
         [UnityTest]
-        public IEnumerator CheckForChanges_Skips_If_Not_Dirty()
+        public IEnumerator CheckForChanges_Skips_If_Value_Unchanged()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "CheckIfNotDirty";
+            so.name = "NoChange";
             so.ForceInitializeForTest();
 
             ObservableRuntimeWatcher.Register(so);
+
+            bool triggered = false;
+            so.OnChanged += (_, __) => triggered = true;
+
+            // No change, wait one frame
             yield return null;
-
-            // forcibly call CheckForChanges with dirty = false
-            so.GetType().GetMethod("CheckForChanges", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.Invoke(so, null);
-
-            Assert.Pass("Did not crash if dirty == false");
+            Assert.IsFalse(triggered, "No change should not trigger OnChanged.");
         }
 
         [UnityTest]
-        public IEnumerator SO_Level_OnChanged_Triggers()
+        public IEnumerator SO_Change_Triggers_OnChanged()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_SO_Level_OnChanged_Triggers";
+            so.name = "TestSO_OnChanged";
             so.ForceInitializeForTest();
 
             bool called = false;
-
-            so.OnChanged += (obj, field) => { if (field == nameof(so.number)) called = true; };
-
+            so.OnChanged += (obj, field) =>
+            {
+                if (field == nameof(so.number)) called = true;
+            };
 
             ObservableRuntimeWatcher.Register(so);
-            so.number.Value = 99;
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
 
-            Assert.IsTrue(called);
+            so.number.Value = 99;
+            yield return null; // Wait for Update to tick
+
+            Assert.IsTrue(called, "OnChanged should trigger on value change.");
         }
 
         [UnityTest]
-        public IEnumerator No_Change_Does_Not_Trigger()
+        public IEnumerator No_OnChanged_When_Setting_Same_Value()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_No_Change_Does_Not_Trigger";
+            so.name = "NoTriggerSameValue";
             so.ForceInitializeForTest();
 
-            // Set value initially
             so.number.Value = 123;
-
-            // Register and cache the current value
             ObservableRuntimeWatcher.Register(so);
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
 
             bool called = false;
             so.OnChanged += (_, __) => called = true;
 
-            // Set the same value again
-            so.number.Value = 123;
-            ObservableRuntimeWatcher.ForceUpdate();
+            so.number.Value = 123; // same value
             yield return null;
 
-            Assert.IsFalse(called);
+            Assert.IsFalse(called, "OnChanged should not trigger when setting same value.");
         }
 
         [UnityTest]
-        public IEnumerator MarkDirty_Missing_Does_Not_Trigger_Change()
+        public IEnumerator Unregister_Stops_Further_Updates()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "NoMarkDirty";
+            so.name = "UnregisterStop";
             so.ForceInitializeForTest();
 
             bool changed = false;
             so.OnChanged += (_, __) => changed = true;
 
-            // Bypassing Value set to simulate no MarkDirty()
-            var field = so.GetType().GetField("number", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-            var newObs = new Observable<int>();
-            // manually set value bypassing MarkDirty
-            typeof(Observable<int>)
-                .GetField("value", BindingFlags.Instance | BindingFlags.NonPublic)
-                ?.SetValue(newObs, 42);
-
-            field?.SetValue(so, newObs);
-
             ObservableRuntimeWatcher.Register(so);
-            ObservableRuntimeWatcher.ForceUpdate();
+            ObservableRuntimeWatcher.Unregister(so);
 
+            so.number.Value = 77;
             yield return null;
-            Assert.IsFalse(changed);
+
+            Assert.IsFalse(changed, "Unregistered SO should not trigger OnChanged.");
         }
 
         [UnityTest]
-        public IEnumerator Triggers_Change_When_No_Previous_Cache()
+        public IEnumerator Multiple_Changes_Trigger_Multiple_Times()
         {
             var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_MissingCacheEntry";
-
+            so.name = "MultipleChanges";
             so.ForceInitializeForTest();
 
-            // Manually remove the field's cached value to simulate missing data
-            var field = typeof(TestSO).GetField("number");
-            var cachedValuesField = typeof(ObservableScriptableObject)
-                .GetField("_cachedValues", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            var cachedDict = cachedValuesField?.GetValue(so) as Dictionary<string, object>;
-            cachedDict?.Remove("number"); // Remove entry to simulate missing cache
-
-            bool called = false;
-            so.OnChanged += (obj, fieldName) =>
-            {
-                if (fieldName == "number") called = true;
-            };
+            int triggerCount = 0;
+            so.OnChanged += (_, __) => triggerCount++;
 
             ObservableRuntimeWatcher.Register(so);
-            so.number.Value = 99;
-            ObservableRuntimeWatcher.ForceUpdate();
 
+            so.number.Value = 1;
+            yield return null;
+            so.number.Value = 2;
             yield return null;
 
-            Assert.IsTrue(called);
+            Assert.AreEqual(2, triggerCount, "OnChanged should trigger for each change.");
         }
-
-        [UnityTest]
-        public IEnumerator Covers_Break_And_Closing_Braces()
-        {
-            var so = ScriptableObject.CreateInstance<TestSO>();
-            so.name = "TestSO_Braces";
-
-            so.ForceInitializeForTest();
-            ObservableRuntimeWatcher.Register(so);
-
-            // First change (goes into the if-block)
-            so.number.Value = 10;
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
-
-            // Second change (goes into the same block again)
-            so.number.Value = 15;
-            ObservableRuntimeWatcher.ForceUpdate();
-            yield return null;
-
-            Assert.Pass("Break path exercised twice");
-        }
-
     }
 }

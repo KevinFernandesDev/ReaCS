@@ -1,4 +1,4 @@
-using ReaCS.Runtime.Internal;
+﻿using ReaCS.Runtime.Internal;
 using System;
 using Unity.Collections;
 using Unity.Properties;
@@ -43,6 +43,9 @@ namespace ReaCS.Runtime.Core
             get => _value;
             set
             {
+#if UNITY_EDITOR
+                if (ObservablePlayModeGuard.Suppress) { _value = value; return; }
+#endif
                 if (!Equals(_value, value))
                 {
                     var oldValue = _value;
@@ -63,15 +66,15 @@ namespace ReaCS.Runtime.Core
 
         public void SyncFromBinding()
         {
-            Value = _value; // Triggers OnChanged, MarkDirty, history, etc.
+            Value = _value;
         }
-
 
         private void LogToBurstHistory(T oldVal, T newVal)
         {
+            if (owner == null) return;
             ReaCSBurstHistory.Init();
 
-            var so = new FixedString64Bytes(owner != null ? owner.name ?? "UnnamedSO" : "null");
+            var so = new FixedString64Bytes(owner.name ?? "UnnamedSO");
             var field = new FixedString64Bytes(fieldName ?? "UnknownField");
             var sys = new FixedString64Bytes(SystemContext.ActiveSystemName ?? "UnknownSystem");
 
@@ -79,34 +82,24 @@ namespace ReaCS.Runtime.Core
             {
                 case float fOld when newVal is float fNew:
                     ReaCSBurstHistory.LogFloat(so, field, fOld, fNew, sys); break;
-
                 case int iOld when newVal is int iNew:
                     ReaCSBurstHistory.LogInt(so, field, iOld, iNew, sys); break;
-
                 case bool bOld when newVal is bool bNew:
                     ReaCSBurstHistory.LogBool(so, field, bOld, bNew, sys); break;
-
                 case Vector2 v2Old when newVal is Vector2 v2New:
                     ReaCSBurstHistory.LogVector2(so, field, v2Old, v2New, sys); break;
-
                 case Vector3 v3Old when newVal is Vector3 v3New:
                     ReaCSBurstHistory.LogVector3(so, field, v3Old, v3New, sys); break;
-
                 case Vector4 v4Old when newVal is Vector4 v4New:
                     ReaCSBurstHistory.LogVector4(so, field, v4Old, v4New, sys); break;
-
                 case Quaternion qOld when newVal is Quaternion qNew:
                     ReaCSBurstHistory.LogQuaternion(so, field, qOld, qNew, sys); break;
-
                 case Color cOld when newVal is Color cNew:
                     ReaCSBurstHistory.LogColor(so, field, cOld, cNew, sys); break;
-
                 case Enum eOld when newVal is Enum eNew:
                     ReaCSBurstHistory.LogEnum(so, field, eOld.ToString(), eNew.ToString(), sys); break;
-
                 case string sOld when newVal is string sNew:
                     ReaCSBurstHistory.LogString(so, field, sOld ?? "null", sNew ?? "null", sys); break;
-
                 default:
 #if UNITY_EDITOR
                     if (_enableDebug)
@@ -115,6 +108,5 @@ namespace ReaCS.Runtime.Core
                     break;
             }
         }
-
     }
 }
