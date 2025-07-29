@@ -20,16 +20,24 @@ namespace ReaCS.Runtime.Core
         public override ObservableScriptableObject Left => LeftSO.Value;
         public override ObservableScriptableObject Right => RightSO.Value;
 
+        private bool _isRegistered;
+
         public void ClearLink()
         {
             LeftSO.Value = null;
             RightSO.Value = null;
+            _isRegistered = false;
         }
         public LinkSO<TLeft, TRight> SetLinks(TLeft left, TRight right)
         {
             LeftSO.Value = left;
-            RightSO.Value = right;
-            Query<LinkSORegistry>().Register(this);
+            RightSO.Value = right; 
+            
+            if (!_isRegistered)
+            {
+                Query<LinkSORegistry>().Register(this);
+                _isRegistered = true;
+            }
             return this;
         }
 

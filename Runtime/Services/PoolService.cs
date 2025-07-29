@@ -3,6 +3,7 @@ using ReaCS.Runtime.Core;
 using ReaCS.Runtime.Registries;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 namespace ReaCS.Runtime.Services
 {
@@ -39,14 +40,14 @@ namespace ReaCS.Runtime.Services
         public int Count => _pool.Count;
 
         // Optional helper for links
-        public TLink Get<TLink, TLeft, TRight>(TLeft left, TRight right)
+        public TLink GetLink<TLink, TLeft, TRight>(TLeft left, TRight right)
             where TLink : LinkSO<TLeft, TRight>, T
             where TLeft : ObservableScriptableObject
             where TRight : ObservableScriptableObject
         {
             var link = Get() as TLink;
-            link.LeftSO.Value = left;
-            link.RightSO.Value = right;
+            link.SetLinks(left, right);
+
             return link;
         }
     }

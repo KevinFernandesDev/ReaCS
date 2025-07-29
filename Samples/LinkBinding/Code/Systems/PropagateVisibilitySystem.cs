@@ -10,7 +10,6 @@ public class PropagateVisibilitySystem : SystemBase<MainObjectData>
     {
         foreach (var link in Access.Query<LinkSORegistry>().FindLinksFrom<MainObjectData, ObjectVisibilityData>(changedSO))
         {
-            Debug.Log(link.name);
             link.RightSO.Value.isVisible.Value = changedSO.isVisible.Value;
         }
     }
