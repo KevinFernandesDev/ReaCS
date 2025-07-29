@@ -16,5 +16,12 @@
         "com.unity.testtools.codecoverage": "1.2.6",
         "com.unity.collections": "2.5.7",
         "com.unity.burst":"1.8.21"
-    }
+    },    
+    "samples": [
+        {
+            "displayName": "Link Binding Sample",
+            "description": "Contains a sample scene to show how to do link bindings and graph-based reaction propagation",
+            "path": "Samples~/LinkBinding"
+        }
+    ]
 }
