@@ -25,7 +25,13 @@ namespace ReaCS.Runtime.Core
             LeftSO.Value = null;
             RightSO.Value = null;
         }
-
+        public LinkSO<TLeft, TRight> SetLinks(TLeft left, TRight right)
+        {
+            LeftSO.Value = left;
+            RightSO.Value = right;
+            Query<LinkSORegistry>().Register(this);
+            return this;
+        }
 
 #if UNITY_EDITOR
         protected override void OnEnable()
