@@ -1,4 +1,24 @@
 # 📦 Changelog
+## [1.1.5] - 2025-07-29
+
+### Added
+- **Link pooling support** via `PoolService<T>`:
+  - `GetLink<TLink, TLeft, TRight>(left, right)` creates or reuses a pooled `LinkSO`
+  - Calls `SetLinks()` internally to assign `LeftSO` and `RightSO`
+  - Automatically registers the link in `LinkSORegistry`
+- `LinkSO<TLeft, TRight>.SetLinks(left, right)`:
+  - Assigns link endpoints
+  - Registers link if not already registered
+  - Supports chaining and pooling
+- `_isRegistered` instance flag in `LinkSO`:
+  - Prevents double-registration
+  - Reset in `ClearLink()` for safe reuse from pool
+
+### Changed
+- `BindAll<TSOParent, TSOChild, TUC, TBinding, TLink>()` now uses `PoolService<LinkSO<...>>` to create links via `GetLink(...)`
+
+### Notes
+- Use `PoolService` for performance-critical or large-scale link creation
 
 ## [1.1.4] - 2025-07-29
 
