@@ -1,4 +1,22 @@
 # 📦 Changelog
+## [1.1.6] - 2025-07-29
+
+### Changed
+- **SystemBase renamed to Reactor**
+  - All `SystemBase` types and usages have been renamed to `Reactor` for clarity and consistency across codebase and docs.
+
+### Fixed
+- **Execution Trace Graph layout and robustness**
+  - System nodes now always start at the leftmost column, with corresponding field nodes appearing directly to their right.
+  - Fixed node placement and stacking issues after timeline discontinuities (frame gaps).
+  - Fixed a bug where field nodes could appear misaligned after consecutive graph rebuilds.
+  - Ensured the graph clears and resets properly on runtime gaps for reliable visual tracing.
+
+### Internal
+- Updated all docs, comments, and internal registration to match new `Reactor` naming.
+
+
+
 ## [1.1.5] - 2025-07-29
 
 ### Added
