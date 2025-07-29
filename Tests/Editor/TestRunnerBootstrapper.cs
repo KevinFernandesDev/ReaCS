@@ -1,4 +1,4 @@
-using ReaCS.Runtime;
+using ReaCS.Runtime.Registries;
 using UnityEditor;
 
 namespace ReaCS.Tests.Editor

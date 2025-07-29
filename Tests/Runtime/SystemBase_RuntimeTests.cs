@@ -2,10 +2,8 @@
 using UnityEngine;
 using UnityEngine.TestTools;
 using System.Collections;
-using ReaCS.Runtime;
-using ReaCS.Runtime.Internal;
-using ReaCS.Tests.Runtime;
 using ReaCS.Tests.Shared;
+using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Tests
 {

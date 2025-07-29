@@ -1,10 +1,10 @@
 using NUnit.Framework;
-using ReaCS.Runtime;
 using UnityEngine;
 using System.Collections.Generic;
 using System.Reflection;
 using ReaCS.Tests.Shared;
 using ReaCS.Runtime.Core;
+using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Tests.EditMode
 {

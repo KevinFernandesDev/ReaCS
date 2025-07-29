@@ -1,5 +1,48 @@
 # 📦 Changelog
 
+## [1.1.4] - 2025-07-29
+
+### Fixed
+- **LinkSORegistry**
+  - `FindLinksFrom<TLeft, TRight>()` and `FindLinksTo<TLeft, TRight>()` returned empty results when using subclasses like `ObjectVisibilityLinkData`
+  - Registry now correctly registers links using the **generic base type** (`LinkSO<TLeft, TRight>`) instead of the concrete subclass
+  - Added logging for registration and queries to diagnose type mismatches and missing link data
+
+### Changed
+- `Register(ScriptableObject)` now resolves the generic base type using `.GetType().BaseType` and validates it is a `LinkSO<,>` before storing
+- `FindLinksFrom` and `FindLinksTo` now reliably return matches for subclassed `LinkSO` types by keying lookups on the generic base
+- Debug logging added to:
+  - `Register(...)`: logs the link name and base type
+  - `FindLinksFrom(...)`: logs query type and number of links found
+
+### Added
+- Manual registration support for dynamically created links using:
+  ```csharp
+  var link = ScriptableObject.CreateInstance<TLink>();
+  link.LeftSO.Value = sourceSO;
+  link.RightSO.Value = targetSO;
+  Access.Query<LinkSORegistry>().Register(link);
+
+
+## [1.1.3] - 2025-05-28
+
+### Fixed
+- **StaticDependencyGraphView**
+  - Incorrect spacing after grouped SOs caused overlapping ungrouped nodes
+  - Now tracks the last Y position of the final node in a group (`lastNodeYInGroup`)
+  - Ensures consistent spacing between groups and ungrouped SOs using `yCursor = Mathf.Max(yCursor, lastUsedY + 80f)`
+
+### Changed
+- Group and ungrouped layout spacing logic unified for predictable stacking
+- Group rendering still includes correct proxy connection and centered layout
+- `LinkTreeGraphView` auto-open behavior updated:
+  - If the window is **not visible**, it does nothing
+  - If the window **is already open**, it will dynamically refresh without reopening or stealing focus
+- Renamed:
+  - `ReaCSIndexRegistry` ➝ `IndexRegistry`
+  - `Use<T>` and `Query<T>` moved to the `ReaCS.Runtime.Access` namespace
+
+
 ## [1.1.2] - 2025-05-28
 
 ### Added

@@ -70,7 +70,7 @@ namespace ReaCS.Runtime.Core
             if (data is IHasEntityId withId)
                 withId.entityId.Value = sharedId;
 
-            Use<ComponentDataBindingService<TSO>>().Register(data, this);
+            Query<ComponentDataBindingRegistry<TSO>>().Register(data, this);
             Query<IndexRegistry>().Register(data);
 
             initialized = true;
@@ -82,7 +82,7 @@ namespace ReaCS.Runtime.Core
         {
             if (data == null) return;
 
-            Use<ComponentDataBindingService<TSO>>().Unregister(data);
+            Query<ComponentDataBindingRegistry<TSO>>().Unregister(data);
             Query<IndexRegistry>().Unregister(data);
 
             if (data != dataSource || useAsTemplate || dataSource == null)

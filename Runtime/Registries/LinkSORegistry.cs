@@ -12,9 +12,15 @@ namespace ReaCS.Runtime.Registries
 
         public void Register(ScriptableObject link)
         {
-            var type = link.GetType();
-            if (!_linkMap.TryGetValue(type, out var list))
-                _linkMap[type] = list = new();
+            var baseType = link.GetType().BaseType;
+            if (baseType == null || !baseType.IsGenericType || baseType.GetGenericTypeDefinition() != typeof(LinkSO<,>))
+            {
+                Debug.LogWarning($"[LinkSORegistry] Tried to register invalid link: {link.name}");
+                return;
+            }
+
+            if (!_linkMap.TryGetValue(baseType, out var list))
+                _linkMap[baseType] = list = new();
             list.Add(link);
         }
 
@@ -47,6 +53,20 @@ namespace ReaCS.Runtime.Registries
                     }
                 }
             }
+        }
+
+        public IEnumerable<LinkSO<TLeft, TRight>> FindLinksFrom<TLeft, TRight>(TLeft left)
+            where TLeft : ObservableScriptableObject
+            where TRight : ObservableScriptableObject
+        {
+            return GetLinks<TLeft, TRight>().Where(link => link.LeftSO.Value == left);
+        }
+
+        public IEnumerable<LinkSO<TLeft, TRight>> FindLinksTo<TLeft, TRight>(TRight right)
+            where TLeft : ObservableScriptableObject
+            where TRight : ObservableScriptableObject
+        {
+            return GetLinks<TLeft, TRight>().Where(link => link.RightSO.Value == right);
         }
 
         public int CountLinksFor(ObservableScriptableObject oso)

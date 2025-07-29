@@ -7,9 +7,9 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Reflection;
-using ReaCS.Runtime;
 using ReaCS.Runtime.Internal;
 using ReaCS.Runtime.Core;
+using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Editor
 {
@@ -312,8 +312,9 @@ namespace ReaCS.Editor
             systemToSO.Clear();
 
             cachedSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
-            soNameToType = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().ToDictionary(s => s.name, s => s.GetType().Name);
-            fieldInfoCache.Clear();
+            soNameToType = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                .GroupBy(s => s.name)
+                .ToDictionary(g => g.Key, g => g.First().GetType().Name); fieldInfoCache.Clear();
 
             if (visibleNodes != null)
                 CorePopulate(visibleNodes);

@@ -7,7 +7,7 @@ using ReaCS.Runtime.Services;
 using static ReaCS.Runtime.Access;
 using ReaCS.Runtime.Registries;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Registries
 {
     public class UnifiedObservableRegistry : IReaCSQuery
     {
@@ -30,7 +30,7 @@ namespace ReaCS.Runtime
 
         public IEnumerable<T> GetByEntity<T>(int entityId) where T : ObservableScriptableObject, new()
         {
-            var bindings = Use<ComponentDataBindingService<T>>().GetAllForEntity(entityId);
+            var bindings = Query<ComponentDataBindingRegistry<T>>().GetAllForEntity(entityId);
             for (int i = 0; i < bindings.Count; i++)
                 yield return bindings[i].data;
         }
@@ -39,7 +39,7 @@ namespace ReaCS.Runtime
             where T : ObservableScriptableObject, new()
             where TBinding : ComponentDataBinding<T>
         {
-            var bindings = Use<ComponentDataBindingService<T>>().GetAllForEntity(id);
+            var bindings = Query<ComponentDataBindingRegistry<T>>().GetAllForEntity(id);
             for (int i = 0; i < bindings.Count; i++)
             {
                 if (bindings[i] is TBinding match)

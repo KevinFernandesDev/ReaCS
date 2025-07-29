@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace ReaCS.Runtime
+namespace ReaCS.Runtime.Registries
 {
     /// <summary>
     /// ObservableRegistry is useful for live editor tooling and system subscription (like in SystemBase<TSO>).

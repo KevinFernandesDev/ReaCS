@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace ReaCS
+namespace ReaCS.Runtime.Registries
 {
     public class EntityRegistry : MonoBehaviour
     {
