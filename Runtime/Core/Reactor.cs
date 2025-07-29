@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace ReaCS.Runtime.Core
 {
-    public abstract class SystemBase<TSO> : MonoBehaviour
+    public abstract class Reactor<TSO> : MonoBehaviour
         where TSO : ObservableScriptableObject
     {
         private string _observedField;
@@ -22,7 +22,7 @@ namespace ReaCS.Runtime.Core
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void ReconnectSystems()
         {
-            foreach (var system in FindObjectsByType<SystemBase<TSO>>(FindObjectsSortMode.InstanceID))
+            foreach (var system in FindObjectsByType<Reactor<TSO>>(FindObjectsSortMode.InstanceID))
             {
                 system.Start();
             }
@@ -158,10 +158,19 @@ namespace ReaCS.Runtime.Core
             if (fieldName == _observedField)
             {
                 ReaCSDebug.Log($"[ReaCS] {GetType().Name} triggered by {so.name}.{fieldName}");
+
+                // 🔧 NEW: Log the system reaction even if no observable is changed yet
+                ReaCSBurstHistory.LogSystemReaction(
+                    soName: so.name,
+                    fieldName: fieldName,
+                    systemName: GetType().Name
+                );
+
                 ReaCSDebug.Log($"[SystemBase] Matching field! Pushing system context: {GetType().Name}");
                 SystemContext.WithSystem(GetType().Name, () => OnFieldChanged((TSO)so));
             }
         }
+
 
         protected abstract void OnFieldChanged(TSO changedSO);
         protected virtual bool IsTarget(TSO so) => true;

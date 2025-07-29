@@ -21,6 +21,8 @@ namespace ReaCS.Editor
         private Port lastPortOut;
         private VisualElement hoverCard;
         private Label hoverCardLabel;
+        Dictionary<int, float> depthMaxRightX = new(); // max X so far per depth
+
         //private readonly Dictionary<string, string> codePreviewCache = new();
         private Dictionary<string, VisualElement> codePreviewCache = new();
         private readonly HashSet<string> knownParams = new();
@@ -53,100 +55,193 @@ namespace ReaCS.Editor
             DeleteElements(graphElements);
 
             var entries = ReaCSBurstHistory.ToArray();
+            int frameThreshold = 30;
+            int lastFrame = -1;
+
             if (entries == null || entries.Length == 0) return;
 
-            float x = 0;
-            float y = 0;
+            int ySpacing = 180;
 
-            Node previousFieldNode = null;
-            string lastSystemName = null;
-            Node lastSystemNode = null;
-            int systemBranchIndex = 0;
+            var systemNodes = new Dictionary<string, Node>();
+            var fieldNodes = new Dictionary<string, Node>();
+            var nodeDepths = new Dictionary<string, int>();
+            var depthYOffsets = new Dictionary<int, int>();
+            var nodeY = new Dictionary<string, float>(); // <--- this is the key!
 
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
+                if (lastFrame != -1 && Mathf.Abs(entry.frame - lastFrame) > frameThreshold)
+                {
+                    DeleteElements(graphElements);
+                    systemNodes.Clear();
+                    fieldNodes.Clear();
+                    nodeDepths.Clear();
+                    depthYOffsets.Clear();
+                    depthMaxRightX.Clear();
+                    depthYOffsets[0] = 0;
+                    depthYOffsets[1] = 0;
+                }
+                lastFrame = entry.frame;
 
                 string systemName = string.IsNullOrEmpty(entry.systemName.ToString()) ? "Unknown" : entry.systemName.ToString();
-                bool sameAsPreviousSystem = (lastSystemName == systemName);
+                string fieldKey = $"{entry.soName}.{entry.fieldName}";
+                bool wasChanged = entry.debugOld.ToString() != entry.debugNew.ToString();
 
-                Node systemNode = sameAsPreviousSystem
-                    ? lastSystemNode
-                    : CreateSystemNode(systemName, x, y);
-
-                if (!sameAsPreviousSystem)
+                // 🛠 Force depth of first system ➝ field pair
+                if (i == 0 || systemNodes.Count == 0)
                 {
+                    nodeDepths[systemName] = 0;
+                    nodeDepths[fieldKey] = 1;
+
+                    // Always create system node at depth 0 and seed depthMaxRightX[0]
+                    int sDepth = nodeDepths[systemName];
+                    float sx = 0f;
+                    int syIndex = depthYOffsets.TryGetValue(sDepth, out var sct) ? sct : 0;
+                    float sy = syIndex * ySpacing;
+                    var systemNode = CreateSystemNode(systemName, sx, sy);
                     AddElement(systemNode);
-                    lastSystemNode = systemNode;
-                    lastSystemName = systemName;
-                    systemBranchIndex = 0;
+                    systemNodes[systemName] = systemNode;
+                    depthYOffsets[sDepth] = syIndex + 1;
+                    // Estimate width
+                    float padding = 40f;
+                    float charWidth = 7.5f;
+                    float estimatedWidth = Mathf.Clamp(systemName.Length * charWidth + padding, 160f, 400f);
+                    depthMaxRightX[0] = estimatedWidth;
+                }
 
-                    if (previousFieldNode != null)
-                    {
-                        var prevOut = lastPortOut;
-                        var sysIn = CreatePort(entry, systemNode, Direction.Input, "In", "Out");
-                        previousFieldNode.outputContainer.Add(prevOut);
-                        systemNode.inputContainer.Add(sysIn);
-                        AddElement(prevOut.ConnectTo(sysIn));
-                    }
-
-                    x += GetResolvedSpacingPerCharaceter(systemName);
+                // 🔁 1. Resolve previous depth
+                int fromDepth = -1;
+                if (wasChanged)
+                {
+                    if (nodeDepths.TryGetValue(systemName, out var sysDepth))
+                        fromDepth = sysDepth;
                 }
                 else
                 {
-                    x -= GetResolvedSpacingPerCharaceter(systemName);
+                    if (nodeDepths.TryGetValue(fieldKey, out var fldDepth))
+                        fromDepth = fldDepth;
                 }
 
-                float branchY = y + systemBranchIndex * ySpacing;
-                float branchX = x;
+                // 🧠 2. Assign depth for the new node
+                int toDepth = (fromDepth == -1 ? 0 : fromDepth + 1);
 
-                var fieldNode = CreateFieldNode(entry, branchX, branchY);
-                AddElement(fieldNode);
+                void SetMin(string k, int d)
+                {
+                    if (!nodeDepths.TryGetValue(k, out var old) || d < old)
+                        nodeDepths[k] = d;
+                }
 
-                x += GetResolvedSpacingPerCharaceter(systemName);
+                if (wasChanged)
+                {
+                    SetMin(systemName, fromDepth == -1 ? 0 : fromDepth);
+                    SetMin(fieldKey, toDepth);
+                }
+                else
+                {
+                    SetMin(fieldKey, fromDepth == -1 ? 0 : fromDepth);
+                    SetMin(systemName, toDepth);
+                }
 
-                var sysOut = CreatePort(entry, systemNode, Direction.Output, "In", "Out") ;
+                // FIELD node (depth 1+)
+                if (!fieldNodes.TryGetValue(fieldKey, out var fieldNode))
+                {
+                    int fDepth = nodeDepths[fieldKey];
+                    float fx = (fDepth == 0) ? 0f : (depthMaxRightX.TryGetValue(fDepth - 1, out var prevRight) ? prevRight + 60f : 60f);
+                    int fyIndex = depthYOffsets.TryGetValue(fDepth, out var fct) ? fct : 0;
+                    float fy = fyIndex * ySpacing;
 
+                    fieldNode = CreateFieldNode(entry, fx, fy);
+                    AddElement(fieldNode);
+                    fieldNodes[fieldKey] = fieldNode;
+                    depthYOffsets[fDepth] = fyIndex + 1;
 
-                var fieldIn = CreatePort(entry, fieldNode, Direction.Input, entry.debugOld.ToString(), "Out");
+                    // Estimate width for next column
+                    float padding = 40f;
+                    float charWidth = 7.5f;
+                    float estimatedWidth = Mathf.Clamp(fieldKey.Length * charWidth + padding, 160f, 400f);
+                    float newRight = fx + estimatedWidth;
+                    if (!depthMaxRightX.ContainsKey(fDepth) || newRight > depthMaxRightX[fDepth])
+                        depthMaxRightX[fDepth] = newRight;
+                }
 
+                // ⚙️ SYSTEM node (depth 0+)
+                if (!systemNodes.ContainsKey(systemName) && nodeDepths[systemName] != 0)
+                {
+                    int sDepth = nodeDepths[systemName];
+                    float sx = depthMaxRightX.TryGetValue(sDepth - 1, out var prevRight) ? prevRight + 60f : 60f;
+                    int syIndex = depthYOffsets.TryGetValue(sDepth, out var sct) ? sct : 0;
+                    float sy = syIndex * ySpacing;
 
-                var fieldOut = CreatePort(entry, fieldNode, Direction.Output, "In", entry.debugNew.ToString());
+                    var systemNode = CreateSystemNode(systemName, sx, sy);
+                    AddElement(systemNode);
+                    systemNodes[systemName] = systemNode;
+                    depthYOffsets[sDepth] = syIndex + 1;
+
+                    // Estimate width
+                    float padding = 40f;
+                    float charWidth = 7.5f;
+                    float estimatedWidth = Mathf.Clamp(systemName.Length * charWidth + padding, 160f, 400f);
+                    float newRight = sx + estimatedWidth;
+                    if (!depthMaxRightX.ContainsKey(sDepth) || newRight > depthMaxRightX[sDepth])
+                        depthMaxRightX[sDepth] = newRight;
+                }
+
+                // (connection/port logic unchanged)
+                var sysIn = CreatePort(entry, systemNodes[systemName], Direction.Input, "In", "Out");
+                var sysOut = CreatePort(entry, systemNodes[systemName], Direction.Output, "In", "Out");
+                var fieldIn = CreatePort(entry, fieldNodes[fieldKey], Direction.Input, entry.debugOld.ToString(), "Out");
+                var fieldOut = CreatePort(entry, fieldNodes[fieldKey], Direction.Output, "In", entry.debugNew.ToString());
+
                 fieldOut.Q<Label>().style.color = Color.white;
-                lastPortOut = fieldOut;
-
-                systemNode.outputContainer.Add(sysOut);
-                fieldNode.titleContainer.style.color = Color.white;
-                fieldNode.titleContainer.style.unityFontStyleAndWeight = FontStyle.Bold;
-                /*Color sysColor;
-                ColorUtility.TryParseHtmlString("#F76c6c", out sysColor);
-                systemNode.mainContainer.style.backgroundColor = sysColor;*/
-
+                fieldNodes[fieldKey].titleContainer.style.color = Color.white;
+                fieldNodes[fieldKey].titleContainer.style.unityFontStyleAndWeight = FontStyle.Bold;
 
                 if (ColorUtility.TryParseHtmlString("#374785", out var fieldNodeColor))
+                    fieldNodes[fieldKey].mainContainer.style.backgroundColor = fieldNodeColor;
+                if (ColorUtility.TryParseHtmlString("#F76C6C", out var outPortColor))
+                    fieldNodes[fieldKey].outputContainer.style.backgroundColor = outPortColor;
+                fieldNodes[fieldKey].outputContainer.style.unityFontStyleAndWeight = FontStyle.Bold;
+
+                if (wasChanged)
                 {
-                    fieldNode.mainContainer.style.backgroundColor = fieldNodeColor;
+                    systemNodes[systemName].outputContainer.Add(sysOut);
+                    fieldNodes[fieldKey].inputContainer.Add(fieldIn);
+                    AddElement(sysOut.ConnectTo(fieldIn));
                 }
-                fieldNode.titleContainer.style.color = Color.white;
-                fieldNode.titleContainer.style.unityFontStyleAndWeight = FontStyle.Bold;
-
-                /*Color inPortColor;
-                ColorUtility.TryParseHtmlString("#474B4F", out inPortColor);
-                fieldNode.inputContainer.style.backgroundColor = inPortColor;*/
-                fieldNode.inputContainer.Add(fieldIn);
-
-                if(ColorUtility.TryParseHtmlString("#F76C6C", out var outPortColor))
+                else
                 {
-                    fieldNode.outputContainer.style.backgroundColor = outPortColor;
+                    fieldNodes[fieldKey].outputContainer.Add(fieldOut);
+                    systemNodes[systemName].inputContainer.Add(sysIn);
+                    AddElement(fieldOut.ConnectTo(sysIn));
                 }
-                fieldNode.outputContainer.style.unityFontStyleAndWeight = FontStyle.Bold;
-                fieldNode.outputContainer.Add(fieldOut);
-
-
-                AddElement(sysOut.ConnectTo(fieldIn));
-                previousFieldNode = fieldNode;
-                systemBranchIndex++;
             }
+        }
+
+        private float GetX(string label, int depth, Dictionary<int, float> depthMaxRightX, bool isSystemNode)
+        {
+            float padding = 40f;
+            float charWidth = 7.5f;
+            float estimatedWidth = Mathf.Clamp(label.Length * charWidth + padding, 160f, 400f);
+
+            // Only system nodes at depth 0 ever set depthMaxRightX[0]
+            if (depth == 0)
+            {
+                if (isSystemNode)
+                    depthMaxRightX[0] = estimatedWidth;
+                return 0f;
+            }
+
+            // All other nodes align to the rightmost of the previous depth
+            float baseX = depthMaxRightX.TryGetValue(depth - 1, out var prevRight) ? prevRight : 0f;
+            float currentX = baseX + 60f; // add spacing between columns
+
+            // Store rightmost X at this depth
+            float newRight = currentX + estimatedWidth;
+            if (!depthMaxRightX.ContainsKey(depth) || newRight > depthMaxRightX[depth])
+                depthMaxRightX[depth] = newRight;
+
+            return currentX;
         }
 
         /// <summary>
@@ -191,7 +286,7 @@ namespace ReaCS.Editor
         }
 
         private void InitializeHoverCard()
-        {            
+        {
             hoverCard = new VisualElement
             {
                 style =
@@ -254,7 +349,7 @@ namespace ReaCS.Editor
             "public", "private", "protected", "class", "void", "override", "return", "if", "else", "new", "var", "using", "namespace"
         };
 
-        private static readonly string[] Methods = {"Log", "nameof"};
+        private static readonly string[] Methods = { "Log", "nameof" };
 
         private VisualElement CreateSyntaxHighlightedLabel(string line)
         {
@@ -469,8 +564,11 @@ namespace ReaCS.Editor
             var node = new Node { title = entry.soName.ToString() };
             node.SetPosition(new Rect(x, y, 250, 120));
 
-            var container = new VisualElement { style = { flexDirection = FlexDirection.Column, 
-                    alignItems = Align.Center, unityFontStyleAndWeight = FontStyle.BoldAndItalic, paddingTop = 6, paddingBottom = 6  } };
+            var container = new VisualElement
+            {
+                style = { flexDirection = FlexDirection.Column,
+                    alignItems = Align.Center, unityFontStyleAndWeight = FontStyle.BoldAndItalic, paddingTop = 6, paddingBottom = 6  }
+            };
             Color color;
             ColorUtility.TryParseHtmlString("#374785", out color);
             container.style.backgroundColor = color;

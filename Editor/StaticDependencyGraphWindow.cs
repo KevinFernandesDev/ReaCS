@@ -424,7 +424,7 @@ namespace ReaCS.Editor
                 var type = script.GetClass();
                 if (type != null &&
                     type.BaseType?.IsGenericType == true &&
-                    type.BaseType.GetGenericTypeDefinition() == typeof(SystemBase<>))
+                    type.BaseType.GetGenericTypeDefinition() == typeof(Reactor<>))
                 {
                     AnimateStatus($"⚙️ Focused on: {type.Name}");
                     graphView?.Populate(graphView.BuildFilterSetForSystem(type));
@@ -446,7 +446,7 @@ namespace ReaCS.Editor
 
             var allSystemTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
-                .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
+                .Where(t => t.IsSubclassOfRawGeneric(typeof(Reactor<>)) && !t.IsAbstract)
                 .ToList();
 
             var visibleNodes = new HashSet<string> { so.name };

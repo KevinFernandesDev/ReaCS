@@ -3,7 +3,7 @@ using ReaCS.Runtime.Core;
 namespace ReaCS.Tests.Shared
 {
     [ReactTo(nameof(TestSO.number))]
-    public class TestSystem : SystemBase<TestSO>
+    public class TestSystem : Reactor<TestSO>
     {
         public TestSO lastChangedSO;
         public int callbackCount;

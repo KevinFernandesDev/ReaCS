@@ -525,7 +525,7 @@ namespace ReaCS.Editor
                       .ToArray();
             var allSystemTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(a => a.GetTypes())
-                .Where(t => t.IsSubclassOfRawGeneric(typeof(SystemBase<>)) && !t.IsAbstract)
+                .Where(t => t.IsSubclassOfRawGeneric(typeof(Reactor<>)) && !t.IsAbstract)
                 .ToList();
 
             var groupedByType = allSOs

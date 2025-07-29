@@ -20,7 +20,7 @@ namespace ReaCS.Runtime.Internal
         String,
         Enum,
         Reference,
-        Unknown
+        Unknown // Used for system-only reaction entries or editor/non reactor code
     }
 
     public static class ReaCSBurstHistory
@@ -87,6 +87,23 @@ namespace ReaCS.Runtime.Internal
             OnEditorLogUpdated?.Invoke();
 #endif
         }
+
+        public static void LogSystemReaction(string soName, string fieldName, string systemName)
+        {
+            Add(new()
+            {
+                frame = Time.frameCount,
+                soName = soName,
+                fieldName = fieldName,
+                systemName = systemName,
+                valueType = ReaCSValueKind.Unknown,
+#if UNITY_EDITOR
+                debugOld = "react",
+                debugNew = "react"
+#endif
+            });
+        }
+
 
         public static void LogFloat(FixedString64Bytes so, FixedString64Bytes field, float oldVal, float newVal, FixedString64Bytes system)
         {

@@ -4,7 +4,7 @@ using ReaCS.Runtime.Services;
 using UnityEngine;
 
 [ReactTo(nameof(ObjectVisibilityData.isVisible))]
-public class ApplyVisibilitySystem : SystemBase<ObjectVisibilityData>
+public class ApplyVisibilityReaction : Reactor<ObjectVisibilityData>
 {
     protected override void OnFieldChanged(ObjectVisibilityData changedSO)
     {

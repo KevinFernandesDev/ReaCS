@@ -4,7 +4,7 @@ using ReaCS.Runtime.Registries;
 using UnityEngine;
 
 [ReactTo(nameof(MainObjectData.isVisible))]
-public class PropagateVisibilitySystem : SystemBase<MainObjectData>
+public class PropagateVisibilityReaction : Reactor<MainObjectData>
 {
     protected override void OnFieldChanged(MainObjectData changedSO)
     {

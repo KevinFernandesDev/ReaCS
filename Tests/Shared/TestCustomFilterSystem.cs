@@ -3,7 +3,7 @@ using ReaCS.Runtime.Core;
 namespace ReaCS.Tests.Shared
 {
     [ReactTo(nameof(TestSO.number))]
-    public class CustomFilterSystem : SystemBase<TestSO>
+    public class CustomFilterSystem : Reactor<TestSO>
     {
         public int ChangeCount = 0;
 
