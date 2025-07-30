@@ -10,7 +10,7 @@ using UnityEditor;
 
 namespace ReaCS.Runtime.Registries
 {
-    public class LinkSORegistry : IReaCSQuery
+    public class LinkSORegistry : IReaCSQuery, IDisposable
     {
         private readonly Dictionary<Type, List<ScriptableObject>> _linkMap = new();
 
@@ -91,30 +91,10 @@ namespace ReaCS.Runtime.Registries
             return count;
         }
 
-        public void Clear()
+        public void Dispose()
         {
+            Debug.Log("[LinkSORegistry] Disposing and clearing link map.");
             _linkMap.Clear();
-#if UNITY_EDITOR
-            Debug.Log("[LinkSORegistry] Cleared all registered links.");
-#endif
         }
-
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetOnDomainReload()
-        {
-            Access.Query<LinkSORegistry>().Clear();
-        }
-
-#if UNITY_EDITOR
-        [InitializeOnLoadMethod]
-        private static void SetupEditorReset()
-        {
-            EditorApplication.playModeStateChanged += state =>
-            {
-                if (state == PlayModeStateChange.ExitingPlayMode)
-                    Access.Query<LinkSORegistry>().Clear();
-            };
-        }
-#endif
     }
 }
