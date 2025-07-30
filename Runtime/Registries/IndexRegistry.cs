@@ -54,7 +54,6 @@ namespace ReaCS.Runtime.Registries
             });
         }
 
-
         public IEnumerable<T> GetAll<T>() where T : ObservableScriptableObject
         {
             if (activeByType.TryGetValue(typeof(T), out var list))

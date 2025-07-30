@@ -1,8 +1,12 @@
-using ReaCS.Runtime.Core;
+﻿using ReaCS.Runtime.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ReaCS.Runtime.Registries
 {
@@ -40,6 +44,7 @@ namespace ReaCS.Runtime.Registries
             => _linkMap.TryGetValue(typeof(LinkSO<TLeft, TRight>), out var list)
                 ? list.Cast<LinkSO<TLeft, TRight>>()
                 : Enumerable.Empty<LinkSO<TLeft, TRight>>();
+
         public IEnumerable<LinkSO> GetAllLinksInvolving(ObservableScriptableObject oso)
         {
             foreach (var list in _linkMap.Values)
@@ -85,6 +90,31 @@ namespace ReaCS.Runtime.Registries
             }
             return count;
         }
-    }
 
+        public void Clear()
+        {
+            _linkMap.Clear();
+#if UNITY_EDITOR
+            Debug.Log("[LinkSORegistry] Cleared all registered links.");
+#endif
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetOnDomainReload()
+        {
+            Access.Query<LinkSORegistry>().Clear();
+        }
+
+#if UNITY_EDITOR
+        [InitializeOnLoadMethod]
+        private static void SetupEditorReset()
+        {
+            EditorApplication.playModeStateChanged += state =>
+            {
+                if (state == PlayModeStateChange.ExitingPlayMode)
+                    Access.Query<LinkSORegistry>().Clear();
+            };
+        }
+#endif
+    }
 }

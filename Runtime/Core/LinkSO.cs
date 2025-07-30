@@ -32,12 +32,6 @@ namespace ReaCS.Runtime.Core
         {
             LeftSO.Value = left;
             RightSO.Value = right; 
-            
-            if (!_isRegistered)
-            {
-                Query<LinkSORegistry>().Register(this);
-                _isRegistered = true;
-            }
             return this;
         }
 
@@ -45,13 +39,22 @@ namespace ReaCS.Runtime.Core
         protected override void OnEnable()
         {
             base.OnEnable();
-            Query<LinkSORegistry>().Register(this);
+            if (!_isRegistered)
+            {
+                Query<LinkSORegistry>().Register(this);
+                _isRegistered = true;
+            }
         }
 
         protected override void OnDisable()
         {
             base.OnDisable();
-            Query<LinkSORegistry>().Unregister(this);
+
+            if (_isRegistered)
+            {
+                Query<LinkSORegistry>().Unregister(this);
+                _isRegistered = false;
+            }
         }
 #endif
     }

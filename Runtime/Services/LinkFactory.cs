@@ -23,8 +23,6 @@ namespace ReaCS.Runtime.Services
             var pool = Use<PoolService<LinkSO<TLeft, TRight>>>();
             var link = pool.GetLink<LinkSO<TLeft, TRight>, TLeft, TRight>(left, right);
             link.name = name ?? $"{left.name}_to_{right.name}";
-
-            Query<LinkSORegistry>().Register(link);
             return link;
         }
 
