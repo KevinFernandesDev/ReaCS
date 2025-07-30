@@ -6,6 +6,7 @@ using System.IO;
 using System.Reflection;
 using UnityEngine;
 using static ReaCS.Runtime.Access;
+using ReaCS.Runtime.Services;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -71,6 +72,7 @@ namespace ReaCS.Runtime.Core
 #if !UNITY_EDITOR
             SaveStateToJson();
 #endif
+            TryReleaseToPool(); // ✅ Auto-release if runtime + pooled
         }
 
 #if UNITY_EDITOR
@@ -79,6 +81,23 @@ namespace ReaCS.Runtime.Core
             ProcessAllFields();
         }
 #endif
+
+        private void TryReleaseToPool()
+        {
+            if (!hideFlags.HasFlag(HideFlags.DontSaveInEditor) && !hideFlags.HasFlag(HideFlags.DontSaveInBuild))
+                return;
+
+            var type = GetType();
+            var poolType = typeof(PoolService<>).MakeGenericType(type);
+
+            if (Access.TryUse(poolType, out var poolInstance))
+            {
+                var releaseMethod = poolType.GetMethod("Release");
+                releaseMethod?.Invoke(poolInstance, new object[] { this });
+                Debug.Log($"[ReaCS] Released {name} back to {poolType.Name}");
+
+            }
+        }
 
         // ───────────────────────────────
         // Initialization

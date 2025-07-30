@@ -19,7 +19,7 @@ namespace ReaCS.Runtime
 
         private static class QueryCache<T> where T : IReaCSQuery, new()
         {
-            public static T instance;
+            public static readonly T instance;
 
             static QueryCache()
             {
@@ -30,13 +30,23 @@ namespace ReaCS.Runtime
 
         private static class UseCache<T> where T : IReaCSService, new()
         {
-            public static T instance;
+            public static readonly T instance;
 
             static UseCache()
             {
                 instance = new T();
                 serviceInstances[typeof(T)] = instance;
             }
+        }
+
+        public static bool TryUse(Type type, out object instance)
+        {
+            return serviceInstances.TryGetValue(type, out instance);
+        }
+
+        public static bool TryQuery(Type type, out object instance)
+        {
+            return queryInstances.TryGetValue(type, out instance);
         }
 
         public static void ClearAll()
