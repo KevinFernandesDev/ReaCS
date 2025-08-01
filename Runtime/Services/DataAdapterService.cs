@@ -4,21 +4,21 @@ using EntityId = ReaCS.Runtime.Core.EntityId;
 
 namespace ReaCS.Runtime.Services
 {
-    public static class DataAdapterService
+    public class DataAdapterService : IReaCSService
     {
         /// <summary>
         /// Adds and initializes a DataAdapter component to a GameObject.
         /// Optionally assigns a data source, EntityId, and useAsTemplate flag.
         /// Will never cause SetActive glitches!
         /// </summary>
-        public static TAdapter Create<TSO, TUC, TAdapter>(
+        public TAdapter Create<TData, TUC, TAdapter>(
             GameObject go,
-            Data dataSource = null,
             EntityId? entityId = null,
+            TData dataSource = null,
             bool useAsTemplate = false)
-            where TSO : ObservableObject, new()
+            where TData : Data, new()
             where TUC : Component
-            where TAdapter : DataAdapter<Data, TUC>
+            where TAdapter : DataAdapter<TData, TUC>
         {
             var adapter = go.AddComponent<TAdapter>();
             adapter.SetupForRuntime(entityId, dataSource, useAsTemplate);

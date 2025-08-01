@@ -7,14 +7,12 @@ public abstract class Registry<T> : IReaCSQuery
 
     public virtual void Register(T obj)
     {
-        if (obj != null)
-            _registered.Add(obj);
+
     }
 
     public virtual void Unregister(T obj)
     {
-        if (obj != null)
-            _registered.Remove(obj);
+
     }
 
     public virtual void Clear() => _registered.Clear();

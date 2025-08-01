@@ -13,7 +13,7 @@ namespace ReaCS.Runtime.Registries
 
         public override void Register(LinkBase link)
         {
-            base.Register(link);
+            //base.Register(link);
 
             // Find the generic Link<TLeft, TRight> base
             var linkType = link.GetType().BaseType;
@@ -25,7 +25,9 @@ namespace ReaCS.Runtime.Registries
 
             if (!_linkMap.TryGetValue(linkType, out var list))
                 _linkMap[linkType] = list = new();
-            list.Add(link);
+
+            if (!list.Contains(link))
+                list.Add(link);
         }
 
         public override void Unregister(LinkBase link)

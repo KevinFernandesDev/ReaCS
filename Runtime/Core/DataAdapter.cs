@@ -81,7 +81,6 @@ namespace ReaCS.Runtime.Core
             data.entityId = resolvedEntityId;
 
             Query<DataAdapterRegistry<TData>>().Register(data, this);
-            Query<IndexRegistry>().Register(data);
 
             initialized = true;
         }
