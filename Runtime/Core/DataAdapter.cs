@@ -136,7 +136,6 @@ namespace ReaCS.Runtime.Core
             if (data == null) return;
 
             Query<DataAdapterRegistry<TData>>().Unregister(data);
-            Query<IndexRegistry>().Unregister(data);
 
             bool ownsData = (data != dataSource || useAsTemplate || dataSource == null);
             if (ownsData)
