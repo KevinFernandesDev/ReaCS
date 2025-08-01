@@ -1,4 +1,49 @@
 # 📦 Changelog
+
+# [1.2.0] - 2025-08-01
+
+### Added
+- **EntityService and EntityRegistry**:
+  - Added `EntityService` for creating entities, registering/unregistering ObservableObjects, and releasing all SOs for an entity on destroy.
+  - `EntityRegistry` now tracks all EntityId relationships, their registered ScriptableObjects, and provides lookup for SOs by EntityId.
+  - Entities can be registered via `EntityService.CreateEntityFor(Transform)`, which automatically adds an `Entity` MonoBehaviour and assigns a unique `EntityId`.
+
+- **Entity-aware pooling for Data, Tag, and Link**:
+  - All pools (`DataPool<T>`, `TagPool<T>`, `LinkPool<T>`) now support an optional `EntityId` parameter on `Get()`, associating pooled objects with an entity in the registry for robust cleanup.
+  - Pools use `IPoolable` and a unified `SetPool(this)` pattern, so SOs self-release to the correct pool without type checks or manual management.
+
+- **DataAdapter and DataAdapterRegistry overhaul**:
+  - Added a generic `DataAdapter<TData, TUC>` for binding any Data SO to a Unity Component, with runtime and design-time wiring.
+  - Introduced runtime service-based DataAdapter creation (`DataAdapterService`), supporting both hierarchy-based and direct EntityId assignment, with warning and fallback for missing entities.
+  - `DataAdapterRegistry<TData>` supports lookup by SO, by EntityId (now using `EntityId` struct), and by Unity component type.
+
+### Changed
+- **All EntityId relationship logic**:
+  - `EntityId` is now a struct (no more int or interface-based tracking). No need to add EntityId to ObservableObject; all relationships are tracked via `EntityRegistry`.
+  - Pools and services express all entity–SO relationships via the registry, not via fields on SOs.
+  - Entity creation logic is unified: design-time and runtime registration both handled consistently.
+
+- **ObservableObject, Data, Tag, Link renaming and rearchitecturing**:
+  - All `Release` logic for SOs is routed through their pool via the `IPoolable` interface.
+  - Removed manual SO tracking from pools; now handled by `EntityRegistry` and `EntityService`.
+
+- **DataAdapter lifecycle**:
+  - `DataAdapter<TData, TUC>` can be created with or without an EntityId, supporting both GLTF flat instantiation and prefab hierarchies.
+  - `OnEnable`/`Awake` deferred init pattern allows DataAdapterService to inject setup before first frame.
+  - DataAdapter will auto-add an `Entity` to the root if none is found in the hierarchy, with a clear developer warning.
+  
+
+### Fixed
+- **Release and cleanup**:
+  - Ensured all SOs (Data, Tag, Link) associated with a given entity are released when that entity is destroyed, preventing leaks and double-registration.
+  - Fixed cases where DataAdapter created at runtime without an entity would fail; now robust fallback to root Entity.
+
+### Internal
+- Updated comments and docs to reflect all new service, registry, and pooling patterns.
+- Unified naming conventions: TSO → TData (where appropriate), no more IHasEntityId.
+
+
+
 ## [1.1.6] - 2025-07-29
 
 ### Changed
