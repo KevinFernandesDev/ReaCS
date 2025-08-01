@@ -2,6 +2,7 @@ using ReaCS.Runtime.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace ReaCS.Runtime.Registries
 {
@@ -9,7 +10,7 @@ namespace ReaCS.Runtime.Registries
     /// Tracks all runtime Data instances by type.
     /// Supports exact-type and inheritance queries.
     /// </summary>
-    public class DataRegistry : Registry<Data>
+    public class DataRegistry : Registry<Data>, IDisposable
     {
         // Per-type index (does not include derived types for queries)
         private readonly Dictionary<Type, HashSet<Data>> _dataByType = new();
@@ -68,6 +69,13 @@ namespace ReaCS.Runtime.Registries
                     foreach (var data in dataSet)
                         yield return (TData)data;
             }
+        }
+
+        public void Dispose()
+        {
+            Debug.Log("[DataRegistry] Disposing and clearing link map.");
+            _dataByType.Clear();
+            Clear();
         }
     }
 }
