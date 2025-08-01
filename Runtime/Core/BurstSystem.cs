@@ -10,7 +10,7 @@ using System.Linq;
 namespace ReaCS.Runtime.Core
 {
     public abstract class BurstSystemBase<TSO, TField> : MonoBehaviour
-        where TSO : ObservableScriptableObject
+        where TSO : ObservableObject
         where TField : struct
     {
         protected abstract TField Map(TSO so);

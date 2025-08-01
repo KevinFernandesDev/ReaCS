@@ -16,7 +16,7 @@ namespace ReaCS.Editor
 
         private static void OnSelectionChanged()
         {
-            if (Selection.activeObject is ObservableScriptableObject oso)
+            if (Selection.activeObject is ObservableObject oso)
             {
                 EditorApplication.delayCall += () =>
                 {

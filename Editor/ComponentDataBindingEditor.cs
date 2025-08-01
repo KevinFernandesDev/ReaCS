@@ -5,7 +5,7 @@ using ReaCS.Runtime.Core;
 
 namespace ReaCS.Editor
 {
-    [CustomEditor(typeof(ComponentDataBinding), true)]
+    [CustomEditor(typeof(DataAdapterComponent), true)]
     public class ComponentDataBindingEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()

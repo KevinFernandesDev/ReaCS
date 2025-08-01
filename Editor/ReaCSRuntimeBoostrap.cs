@@ -12,7 +12,7 @@ namespace ReaCS.Editor
         [InitializeOnEnterPlayMode]
         public static void RehydrateAllSOs()
         {
-            var all = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
+            var all = Resources.FindObjectsOfTypeAll<ObservableObject>();
 
             foreach (var so in all)
             {

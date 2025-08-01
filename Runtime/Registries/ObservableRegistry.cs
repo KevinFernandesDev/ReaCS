@@ -11,16 +11,16 @@ namespace ReaCS.Runtime.Registries
     /// </summary>
     public static class ObservableRegistry
     {
-        private static readonly Dictionary<Type, List<ObservableScriptableObject>> _instances = new();
-        public static event Action<ObservableScriptableObject> OnRegistered;
-        public static event Action<ObservableScriptableObject> OnUnregistered;
+        private static readonly Dictionary<Type, List<ObservableObject>> _instances = new();
+        public static event Action<ObservableObject> OnRegistered;
+        public static event Action<ObservableObject> OnUnregistered;
 
 #if UNITY_EDITOR
         public static Action<string, string> OnEditorFieldChanged = delegate { };
 
 #endif
 
-        public static void Register(ObservableScriptableObject so)
+        public static void Register(ObservableObject so)
         {
 /*#if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
@@ -30,7 +30,7 @@ namespace ReaCS.Runtime.Registries
             var type = so.GetType();
             if (!_instances.TryGetValue(type, out var list))
             {
-                list = new List<ObservableScriptableObject>();
+                list = new List<ObservableObject>();
                 _instances[type] = list;
             }
 
@@ -41,7 +41,7 @@ namespace ReaCS.Runtime.Registries
             }
         }
 
-        public static void Unregister(ObservableScriptableObject so)
+        public static void Unregister(ObservableObject so)
         {
 /*#if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
@@ -59,7 +59,7 @@ namespace ReaCS.Runtime.Registries
             }
         }
 
-        public static IReadOnlyList<T> GetAll<T>() where T : ObservableScriptableObject
+        public static IReadOnlyList<T> GetAll<T>() where T : ObservableObject
         {
             if (_instances.TryGetValue(typeof(T), out var list))
                 return list.ConvertAll(x => (T)x);

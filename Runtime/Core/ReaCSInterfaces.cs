@@ -6,15 +6,15 @@ namespace ReaCS.Runtime.Core
     public interface IReaCSQuery { }
     public interface IObservableReference
     {
-        ObservableScriptableObject Value { get; }
+        ObservableObject Value { get; }
     }
 
-    public interface IHasOwner<TOwner> where TOwner : ObservableScriptableObject
+    public interface IHasOwner<TOwner> where TOwner : ObservableObject
     {
         Observable<TOwner> Owner { get; }
     }
 
-    public interface IHasDataSource<T> where T : ObservableScriptableObject
+    public interface IHasDataSource<T> where T : ObservableObject
     {
         T DataSource { get; }
         bool UseAsTemplate { get; }
@@ -32,10 +32,37 @@ namespace ReaCS.Runtime.Core
 
     public interface IInitializableObservable
     {
-        void Init(ObservableScriptableObject owner, string fieldName);
+        void Init(ObservableObject owner, string fieldName);
     }
     public interface ILinkResettable
     {
         void ClearLink();
+    }
+    public interface IPool
+    {
+        void Release(IPoolable obj);
+    }
+
+    public interface IPoolable
+    {
+        void SetPool(IPool pool);
+        void Initialize();
+        void Release();
+    }
+
+    public interface ICoreRegistrable
+    {
+        void Register();
+        void Unregister();
+    }
+
+    public interface IRegistrable
+    {
+        void RegisterSelf();
+        void UnregisterSelf();
+    }
+    public interface ILinkConnector
+    {
+        void Connect(ObservableObject left, ObservableObject right);
     }
 }

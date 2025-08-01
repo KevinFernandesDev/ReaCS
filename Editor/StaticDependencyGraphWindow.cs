@@ -73,7 +73,7 @@ namespace ReaCS.Editor
 
                 if (!isLocked)
                 {
-                    if (Selection.activeObject is ObservableScriptableObject so)
+                    if (Selection.activeObject is ObservableObject so)
                     {
                         FilterToSO(so);
                     }
@@ -90,7 +90,7 @@ namespace ReaCS.Editor
                 isLocked = false;
                 lockToggle.SetValueWithoutNotify(false);
 
-                if (Selection.activeObject is ObservableScriptableObject so)
+                if (Selection.activeObject is ObservableObject so)
                 {
                     FilterToSO(so);
                 }
@@ -386,7 +386,7 @@ namespace ReaCS.Editor
             isLocked = false;
             lockToggle.SetValueWithoutNotify(false);
 
-            if (Selection.activeObject is ObservableScriptableObject so)
+            if (Selection.activeObject is ObservableObject so)
             {
                 FilterToSO(so);
             }
@@ -410,7 +410,7 @@ namespace ReaCS.Editor
         {
             if (isLocked) return;
 
-            if (Selection.activeObject is ObservableScriptableObject so)
+            if (Selection.activeObject is ObservableObject so)
             {
                 AnimateStatus($"🔬 Focused on: {so.name}.asset");
                 graphView.SetFocusedSO(so.name);
@@ -440,7 +440,7 @@ namespace ReaCS.Editor
             graphView.schedule.Execute(() => graphView.AnimateFrameAllNodes()).ExecuteLater(100);
         }
 
-        private void FilterToSO(ObservableScriptableObject so)
+        private void FilterToSO(ObservableObject so)
         {
             AnimateStatus($"🔬 Focused on: {so.name}.asset");
 

@@ -3,8 +3,8 @@ using System;
 namespace ReaCS.Runtime.Core
 {
     [Serializable]
-    public class ObservableSO<T> : Observable<T>, IObservableReference where T : ObservableScriptableObject
+    public class ObservableSO<T> : Observable<T>, IObservableReference where T : ObservableObject
     {
-        ObservableScriptableObject IObservableReference.Value => Value;
+        ObservableObject IObservableReference.Value => Value;
     }
 }

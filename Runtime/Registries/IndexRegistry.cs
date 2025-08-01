@@ -9,21 +9,21 @@ namespace ReaCS.Runtime.Registries
 {
     public class IndexRegistry : IReaCSQuery
     {
-        private readonly Dictionary<Type, List<ObservableScriptableObject>> activeByType = new();
+        private readonly Dictionary<Type, List<ObservableObject>> activeByType = new();
         private readonly List<ScriptableObject> allLinks = new();
 
-        public void Register(ObservableScriptableObject so)
+        public void Register(ObservableObject so)
         {
             var type = so.GetType();
             if (!activeByType.TryGetValue(type, out var list))
                 activeByType[type] = list = new();
             list.Add(so);
 
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkSO<,>))
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Link<,>))
                 allLinks.Add(so);
         }
 
-        public void Unregister(ObservableScriptableObject so)
+        public void Unregister(ObservableObject so)
         {
             if (so == null) return;
 
@@ -34,7 +34,7 @@ namespace ReaCS.Runtime.Registries
                 list.Remove(so);
 
             // If it's a link itself, remove directly from the allLinks list
-            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(LinkSO<,>))
+            if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Link<,>))
             {
                 allLinks.Remove(so);
                 return;
@@ -54,7 +54,7 @@ namespace ReaCS.Runtime.Registries
             });
         }
 
-        public IEnumerable<T> GetAll<T>() where T : ObservableScriptableObject
+        public IEnumerable<T> GetAll<T>() where T : ObservableObject
         {
             if (activeByType.TryGetValue(typeof(T), out var list))
                 return list.Cast<T>();
@@ -62,7 +62,7 @@ namespace ReaCS.Runtime.Registries
         }
 
         public NativeArray<TField> ToNativeArrayOf<TSO, TField>(Func<TSO, TField> selector, Allocator allocator)
-            where TSO : ObservableScriptableObject
+            where TSO : ObservableObject
             where TField : struct
         {
             if (!activeByType.TryGetValue(typeof(TSO), out var raw))
@@ -79,7 +79,7 @@ namespace ReaCS.Runtime.Registries
         }
 
         public void ApplyNativeArrayTo<TSO, TField>(NativeArray<TField> native, Action<TSO, TField> apply)
-            where TSO : ObservableScriptableObject
+            where TSO : ObservableObject
             where TField : struct
         {
             if (!activeByType.TryGetValue(typeof(TSO), out var list)) return;
@@ -92,19 +92,19 @@ namespace ReaCS.Runtime.Registries
         }
 
         public IEnumerable<TRight> GetLinkedTarget<TLeft, TRight>(TLeft left)
-            where TLeft : ObservableScriptableObject
-            where TRight : ObservableScriptableObject
+            where TLeft : ObservableObject
+            where TRight : ObservableObject
         {
-            return allLinks.OfType<LinkSO<TLeft, TRight>>()
+            return allLinks.OfType<Link<TLeft, TRight>>()
                 .Where(link => (TLeft)link.Left == left)
                 .Select(link => (TRight)link.Right);
         }
 
         public IEnumerable<TLeft> GetLinkedOwner<TLeft, TRight>(TRight right)
-            where TLeft : ObservableScriptableObject
-            where TRight : ObservableScriptableObject
+            where TLeft : ObservableObject
+            where TRight : ObservableObject
         {
-            return allLinks.OfType<LinkSO<TLeft, TRight>>()
+            return allLinks.OfType<Link<TLeft, TRight>>()
                 .Where(link => (TRight)link.Right == right)
                 .Select(link => (TLeft)link.Left);
         }

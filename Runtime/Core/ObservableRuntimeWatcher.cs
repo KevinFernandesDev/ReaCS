@@ -13,8 +13,8 @@ namespace ReaCS.Runtime.Core
         private static ObservableRuntimeWatcher _instance;
         private static bool _isInitialized = false;
 
-        private static Dictionary<ObservableScriptableObject, int> _objectToId = new();
-        private static List<ObservableScriptableObject> _idToObject = new();
+        private static Dictionary<ObservableObject, int> _objectToId = new();
+        private static List<ObservableObject> _idToObject = new();
 
         // ✅ Event-driven dirty fields
         private static List<(int, string)> _dirtyFields = new(256);
@@ -72,7 +72,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        public static void Register(ObservableScriptableObject so)
+        public static void Register(ObservableObject so)
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
@@ -101,7 +101,7 @@ namespace ReaCS.Runtime.Core
         }
 
 
-        public static void Unregister(ObservableScriptableObject so)
+        public static void Unregister(ObservableObject so)
         {
             if (!_objectToId.TryGetValue(so, out int id)) return;
 
@@ -123,7 +123,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        public static void NotifyDirty(ObservableScriptableObject so, string fieldName)
+        public static void NotifyDirty(ObservableObject so, string fieldName)
         {
             if (!_objectToId.TryGetValue(so, out int id)) return;
 

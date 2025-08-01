@@ -10,15 +10,15 @@ using ReaCS.Runtime.Registries;
 
 namespace ReaCS.Editor
 {
-    [CustomEditor(typeof(ObservableScriptableObject), true)]
+    [CustomEditor(typeof(ObservableObject), true)]
     public class ObservableSOEditor : UnityEditor.Editor
     {
-        private ObservableScriptableObject targetSO;
+        private ObservableObject targetSO;
         private List<FieldInfo> observableFields;
 
         protected virtual void OnEnable()
         {
-            targetSO = (ObservableScriptableObject)target;
+            targetSO = (ObservableObject)target;
             observableFields = new List<FieldInfo>();
 
             var fields = targetSO.GetType().GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -153,9 +153,9 @@ namespace ReaCS.Editor
         }
 
 
-        private void DrawLinkInfo(ObservableScriptableObject oso)
+        private void DrawLinkInfo(ObservableObject oso)
         {
-            var linkCount = Query<LinkSORegistry>().CountLinksFor(oso);
+            var linkCount = Query<LinkRegistry>().CountLinksFor(oso);
 
             EditorGUILayout.LabelField("Link Tree", EditorStyles.boldLabel);
             EditorGUILayout.LabelField($"🔗 {linkCount} links found", EditorStyles.helpBox);

@@ -34,7 +34,7 @@ namespace ReaCS.Tests.EditMode
         {
             var field = typeof(ObservableRegistry)
                 .GetField("_instances", BindingFlags.NonPublic | BindingFlags.Static);
-            var dict = (Dictionary<System.Type, List<ObservableScriptableObject>>)field.GetValue(null);
+            var dict = (Dictionary<System.Type, List<ObservableObject>>)field.GetValue(null);
             dict.Clear();
         }
 

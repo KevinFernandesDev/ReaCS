@@ -71,7 +71,7 @@ namespace ReaCS.Editor
             for (int i = 0; i < entries.Length; i++)
             {
                 var entry = entries[i];
-                if (lastFrame != -1 && Mathf.Abs(entry.frame - lastFrame) > frameThreshold)
+                if (lastFrame != -1 && Mathf.Abs(entry.frame - lastFrame) > entry.frame + frameThreshold)
                 {
                     DeleteElements(graphElements);
                     systemNodes.Clear();

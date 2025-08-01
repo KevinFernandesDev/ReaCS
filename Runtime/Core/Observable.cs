@@ -12,7 +12,7 @@ namespace ReaCS.Runtime.Core
     {
         [SerializeField] public bool ShouldPersist = false;
 
-        [NonSerialized] private ObservableScriptableObject owner;
+        [NonSerialized] private ObservableObject owner;
         [NonSerialized] private string fieldName;
         [SerializeField] public T _value;
 
@@ -32,7 +32,7 @@ namespace ReaCS.Runtime.Core
             remove => _onChanged -= value;
         }
 
-        public void Init(ObservableScriptableObject owner, string fieldName)
+        public void Init(ObservableObject owner, string fieldName)
         {
             this.owner = owner;
             this.fieldName = fieldName;

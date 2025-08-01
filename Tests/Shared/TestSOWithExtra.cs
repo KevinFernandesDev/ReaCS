@@ -3,7 +3,7 @@ using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.Shared
 {
-    public class TestSOWithExtra : ObservableScriptableObject
+    public class TestSOWithExtra : Data
     {
         [Observable] public Observable<int> number;
         public int hiddenField = 999;

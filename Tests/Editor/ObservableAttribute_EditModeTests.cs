@@ -7,7 +7,7 @@ namespace ReaCS.Tests.EditMode
 {
     public class ObservableAttribute_EditModeTests
     {
-        private class AttributeSO : ObservableScriptableObject
+        private class AttributeSO : Data
         {
             [Observable] public Observable<int> number;
         }

@@ -13,13 +13,13 @@ namespace ReaCS.Runtime.Registries
     {
         private readonly IndexRegistry _index = Query<IndexRegistry>();
 
-        public IEnumerable<T> GetAllRuntime<T>() where T : ObservableScriptableObject
+        public IEnumerable<T> GetAllRuntime<T>() where T : ObservableObject
             => _index.GetAll<T>();
 
-        public IReadOnlyList<T> GetAllEditorTracked<T>() where T : ObservableScriptableObject
+        public IReadOnlyList<T> GetAllEditorTracked<T>() where T : ObservableObject
             => ObservableRegistry.GetAll<T>();
 
-        public IEnumerable<T> GetAll<T>() where T : ObservableScriptableObject
+        public IEnumerable<T> GetAll<T>() where T : ObservableObject
         {
 #if UNITY_EDITOR
             return ObservableRegistry.GetAll<T>();
@@ -28,27 +28,27 @@ namespace ReaCS.Runtime.Registries
 #endif
         }
 
-        public IEnumerable<T> GetByEntity<T>(int entityId) where T : ObservableScriptableObject, new()
+        /*public IEnumerable<T> GetByEntity<T>(int entityId) where T : ObservableObject, new()
         {
-            var bindings = Query<ComponentDataBindingRegistry<T>>().GetAllForEntity(entityId);
+            var bindings = Query<DataAdapterRegistry<T>>().GetAllForEntity(entityId);
             for (int i = 0; i < bindings.Count; i++)
                 yield return bindings[i].data;
         }
 
-        public IEnumerable<TBinding> GetBindingsForEntity<T, TBinding>(ReaCSEntityId id)
-            where T : ObservableScriptableObject, new()
-            where TBinding : ComponentDataBinding<T>
+        public IEnumerable<TBinding> GetBindingsForEntity<T, TBinding>(Core.EntityId id)
+            where T : ObservableObject, new()
+            where TBinding : DataAdapterBase<T>
         {
-            var bindings = Query<ComponentDataBindingRegistry<T>>().GetAllForEntity(id);
+            var bindings = Query<DataAdapterRegistry<T>>().GetAllForEntity(id);
             for (int i = 0; i < bindings.Count; i++)
             {
                 if (bindings[i] is TBinding match)
                     yield return match;
             }
-        }
+        }*/
 
         public NativeArray<TField> BuildNativeLookup<TSO, TField>(Func<TSO, TField> selector, Allocator allocator)
-            where TSO : ObservableScriptableObject
+            where TSO : ObservableObject
             where TField : struct
         {
 #if UNITY_EDITOR

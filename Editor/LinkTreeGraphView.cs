@@ -14,11 +14,11 @@ namespace ReaCS.Editor
     public class LinkTreeGraphView : GraphView
     {
         private readonly List<Edge> edges = new();
-        private readonly Dictionary<ObservableScriptableObject, Node> nodeMap = new();
-        private readonly HashSet<(ObservableScriptableObject, ObservableScriptableObject)> drawnLinks = new();
-        private ObservableScriptableObject rootNodeSO;
+        private readonly Dictionary<ObservableObject, Node> nodeMap = new();
+        private readonly HashSet<(ObservableObject, ObservableObject)> drawnLinks = new();
+        private ObservableObject rootNodeSO;
 
-        public LinkTreeGraphView(ObservableScriptableObject root)
+        public LinkTreeGraphView(ObservableObject root)
         {
             var helpLabel = new Label("⤷ Shortcuts:  [P] Ping Selected")
             {
@@ -57,7 +57,7 @@ namespace ReaCS.Editor
             {
                 if (evt.keyCode == KeyCode.P && selection.FirstOrDefault() is Node selected)
                 {
-                    if (selected.userData is ObservableScriptableObject oso)
+                    if (selected.userData is ObservableObject oso)
                         EditorGUIUtility.PingObject(oso);
                 }
             });
@@ -74,15 +74,15 @@ namespace ReaCS.Editor
             }).ExecuteLater(100);
         }
 
-        private void TraverseAll(ObservableScriptableObject root, Node rootNode)
+        private void TraverseAll(ObservableObject root, Node rootNode)
         {
-            var queue = new Queue<(ObservableScriptableObject, Node, Vector2)>();
+            var queue = new Queue<(ObservableObject, Node, Vector2)>();
             queue.Enqueue((root, rootNode, rootNode.GetPosition().position));
 
             while (queue.Count > 0)
             {
                 var (currentSO, currentNode, currentPos) = queue.Dequeue();
-                var links = Query<LinkSORegistry>().GetAllLinksInvolving(currentSO);
+                var links = Query<LinkRegistry>().GetAllLinksInvolving(currentSO);
                 float yOffset = -((links.Count() - 1) * 100f) / 2f;
 
                 foreach (var link in links)
@@ -114,7 +114,7 @@ namespace ReaCS.Editor
             }
         }
 
-        private Node CreateNode(ObservableScriptableObject oso, Vector2 position, bool isRoot)
+        private Node CreateNode(ObservableObject oso, Vector2 position, bool isRoot)
         {
             var node = new Node
             {

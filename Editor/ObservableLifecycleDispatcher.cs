@@ -15,7 +15,7 @@ namespace ReaCS.Editor
 
         private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
-            var allSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
+            var allSOs = Resources.FindObjectsOfTypeAll<ObservableObject>();
 
             if (state == PlayModeStateChange.ExitingEditMode)
             {

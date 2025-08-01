@@ -3,7 +3,7 @@ using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.Shared
 {
-    public class TestSO : ObservableScriptableObject
+    public class TestSO : Data
     {
         [Observable] public Observable<int> number;
 

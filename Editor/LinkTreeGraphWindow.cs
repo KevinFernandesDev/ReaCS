@@ -18,13 +18,13 @@ namespace ReaCS.Editor
             window.Show();
         }
 
-        public static void ShowForRoot(ObservableScriptableObject root)
+        public static void ShowForRoot(ObservableObject root)
         {
             var window = GetWindow<LinkTreeGraphWindow>("Link Tree Graph");
             window.Initialize(root);
         }
 
-        private void Initialize(ObservableScriptableObject root)
+        private void Initialize(ObservableObject root)
         {
             rootVisualElement.Clear();
             graphView = new LinkTreeGraphView(root);

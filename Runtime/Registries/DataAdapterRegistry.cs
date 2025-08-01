@@ -2,38 +2,36 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using EntityId = ReaCS.Runtime.Core.EntityId;
 
-namespace ReaCS.Runtime.Services
+namespace ReaCS.Runtime.Registries
 {
-    public class ComponentDataBindingRegistry<TSO> : IReaCSQuery
-        where TSO : ObservableScriptableObject, new()
+    public class DataAdapterRegistry<TData> : IReaCSQuery
+        where TData : Data, new()
     {
-        private readonly Dictionary<TSO, List<ComponentDataBinding<TSO>>> _map = new();
-        private readonly Dictionary<int, List<ComponentDataBinding<TSO>>> _byEntity = new();
-        private readonly Dictionary<Type, List<ComponentDataBinding<TSO>>> _byComponentType = new();
+        private readonly Dictionary<TData, List<DataAdapterBase<TData>>> _map = new();
+        private readonly Dictionary<EntityId, List<DataAdapterBase<TData>>> _byEntityId = new();
+        private readonly Dictionary<Type, List<DataAdapterBase<TData>>> _byComponentType = new();
 
-        public void Register(TSO so, ComponentDataBinding<TSO> binding)
+        public void Register(TData so, DataAdapterBase<TData> binding)
         {
             // By SO
             if (!_map.TryGetValue(so, out var list))
                 _map[so] = list = new();
             list.Add(binding);
 
-            // By EntityId
-            if (so is IHasEntityId withId)
-            {
-                int id = withId.entityId.Value;
-                if (!_byEntity.TryGetValue(id, out var byEntityList))
-                    _byEntity[id] = byEntityList = new();
-                byEntityList.Add(binding);
-            }
+            // By EntityId (uses struct key, never int)
+            EntityId eid = so.entityId;
+            if (!_byEntityId.TryGetValue(eid, out var byEntityList))
+                _byEntityId[eid] = byEntityList = new();
+            byEntityList.Add(binding);
 
             // By TUC
             var bindingType = binding.GetType();
-            while (bindingType != null && bindingType != typeof(ComponentDataBinding<TSO>))
+            while (bindingType != null && bindingType != typeof(DataAdapterBase<TData>))
             {
                 if (bindingType.IsGenericType &&
-                    bindingType.GetGenericTypeDefinition() == typeof(ComponentDataBinding<,>))
+                    bindingType.GetGenericTypeDefinition() == typeof(DataAdapter<,>))
                 {
                     var tucType = bindingType.GetGenericArguments()[1];
                     if (!_byComponentType.TryGetValue(tucType, out var typedList))
@@ -41,13 +39,13 @@ namespace ReaCS.Runtime.Services
                     typedList.Add(binding);
                     break;
                 }
-
                 bindingType = bindingType.BaseType;
             }
         }
 
-        public void Unregister(TSO so)
+        public void Unregister(TData so)
         {
+            // By SO
             if (_map.TryGetValue(so, out var list))
             {
                 list.RemoveAll(b => b == null || b.data == so);
@@ -55,34 +53,32 @@ namespace ReaCS.Runtime.Services
                     _map.Remove(so);
             }
 
-            if (so is IHasEntityId withId)
+            // By EntityId
+            EntityId eid = so.entityId;
+            if (_byEntityId.TryGetValue(eid, out var byEntityList))
             {
-                int id = withId.entityId.Value;
-                if (_byEntity.TryGetValue(id, out var byEntityList))
-                {
-                    byEntityList.RemoveAll(b => b == null || b.data == so);
-                    if (byEntityList.Count == 0)
-                        _byEntity.Remove(id);
-                }
+                byEntityList.RemoveAll(b => b == null || b.data == so);
+                if (byEntityList.Count == 0)
+                    _byEntityId.Remove(eid);
             }
 
+            // By TUC
             foreach (var typedList in _byComponentType.Values)
                 typedList.RemoveAll(b => b == null || b.data == so);
         }
 
-        public bool TryGetBinding(TSO so, out ComponentDataBinding<TSO> binding)
+        public bool TryGetBinding(TData so, out DataAdapterBase<TData> binding)
         {
             if (_map.TryGetValue(so, out var list) && list.Count > 0)
             {
                 binding = list[0];
                 return true;
             }
-
             binding = null;
             return false;
         }
 
-        public bool TryGetUnityComponent<TUC>(TSO so, out TUC component)
+        public bool TryGetUnityComponent<TUC>(TData so, out TUC component)
             where TUC : Component
         {
             component = null;
@@ -90,9 +86,9 @@ namespace ReaCS.Runtime.Services
             {
                 foreach (var binding in list)
                 {
-                    if (binding is ComponentDataBinding<TSO, TUC> typed)
+                    if (binding is DataAdapter<TData, TUC> typed)
                     {
-                        component = typed.uc;
+                        component = typed.component;
                         return true;
                     }
                 }
@@ -100,53 +96,49 @@ namespace ReaCS.Runtime.Services
             return false;
         }
 
-        public IEnumerable<TUC> GetAllUnityComponents<TUC>(TSO so)
+        public IEnumerable<TUC> GetAllUnityComponents<TUC>(TData so)
             where TUC : Component
         {
             if (_map.TryGetValue(so, out var list))
             {
                 foreach (var binding in list)
                 {
-                    if (binding is ComponentDataBinding<TSO, TUC> typed)
-                        yield return typed.uc;
+                    if (binding is DataAdapter<TData, TUC> typed)
+                        yield return typed.component;
                 }
             }
         }
 
         [Obsolete("Use ComponentDataBindingLookup<TSO> in runtime systems! This is for tools & inspectors")]
-        public ComponentDataBinding<TSO> GetBinding(TSO so)
+        public DataAdapterBase<TData> GetBinding(TData so)
         {
             if (_map.TryGetValue(so, out var list) && list.Count > 0)
                 return list[0];
             return null;
         }
 
-        public IEnumerable<ComponentDataBinding<TSO>> GetAllBindings()
+        public IEnumerable<DataAdapterBase<TData>> GetAllBindings()
         {
             foreach (var list in _map.Values)
-            {
                 foreach (var b in list)
                     yield return b;
-            }
         }
 
-        public List<ComponentDataBinding<TSO>> GetAllForEntity(int entityId)
+        // The main method you want:
+        public List<DataAdapterBase<TData>> GetAllForEntity(EntityId entityId)
         {
-            if (_byEntity.TryGetValue(entityId, out var list))
+            if (_byEntityId.TryGetValue(entityId, out var list))
                 return list;
-            return ListPool<ComponentDataBinding<TSO>>.Empty;
+            return ListPool<DataAdapterBase<TData>>.Empty;
         }
 
-        public List<ComponentDataBinding<TSO>> GetAllForEntity(ReaCSEntityId entityId)
-            => GetAllForEntity(entityId.Value);
-
-        public IEnumerable<ComponentDataBinding<TSO, TUC>> GetTypedBindings<TUC>() where TUC : Component
+        public IEnumerable<DataAdapter<TData, TUC>> GetTypedBindings<TUC>() where TUC : Component
         {
             if (_byComponentType.TryGetValue(typeof(TUC), out var list))
             {
                 foreach (var b in list)
                 {
-                    if (b is ComponentDataBinding<TSO, TUC> typed)
+                    if (b is DataAdapter<TData, TUC> typed)
                         yield return typed;
                 }
             }
@@ -155,10 +147,10 @@ namespace ReaCS.Runtime.Services
         public IEnumerable<TUC> GetTypedUnityComponents<TUC>() where TUC : Component
         {
             foreach (var b in GetTypedBindings<TUC>())
-                yield return b.uc;
+                yield return b.component;
         }
 
-        public IEnumerable<ComponentDataBinding<TSO, TUC>> GetTypedBindingsFor<TUC>(TSO target) where TUC : Component
+        public IEnumerable<DataAdapter<TData, TUC>> GetTypedBindingsFor<TUC>(TData target) where TUC : Component
         {
             foreach (var so in GetTypedBindings<TUC>())
             {

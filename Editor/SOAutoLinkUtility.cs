@@ -12,20 +12,20 @@ namespace ReaCS.Editor
         [MenuItem("Assets/ReaCS/Create Link To...", true)]
         public static bool ValidateLinkTarget()
         {
-            return Selection.activeObject is ObservableScriptableObject;
+            return Selection.activeObject is ObservableObject;
         }
 
         [MenuItem("Assets/ReaCS/Create Link To...")]
         public static void CreateLinkToAnotherSO()
         {
-            var sourceSO = Selection.activeObject as ObservableScriptableObject;
+            var sourceSO = Selection.activeObject as ObservableObject;
             if (sourceSO == null) return;
 
             string path = EditorUtility.OpenFilePanel("Select Target SO", "Assets", "asset");
             if (string.IsNullOrEmpty(path)) return;
 
             string assetPath = "Assets" + path.Replace(Application.dataPath, "");
-            var targetSO = AssetDatabase.LoadAssetAtPath<ObservableScriptableObject>(assetPath);
+            var targetSO = AssetDatabase.LoadAssetAtPath<ObservableObject>(assetPath);
             if (targetSO == null)
             {
                 EditorUtility.DisplayDialog("Invalid Target", "That file is not a valid ObservableScriptableObject.", "OK");
@@ -35,12 +35,12 @@ namespace ReaCS.Editor
             CreateLinkAsset(sourceSO, targetSO);
         }
 
-        private static void CreateLinkAsset(ObservableScriptableObject left, ObservableScriptableObject right)
+        private static void CreateLinkAsset(ObservableObject left, ObservableObject right)
         {
             var leftType = left.GetType();
             var rightType = right.GetType();
 
-            var linkType = typeof(LinkSO<,>).MakeGenericType(leftType, rightType);
+            var linkType = typeof(Link<,>).MakeGenericType(leftType, rightType);
             var link = ScriptableObject.CreateInstance(linkType);
 
             // Use reflection to set Left/Right

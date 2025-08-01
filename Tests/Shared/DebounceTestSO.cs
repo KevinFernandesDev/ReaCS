@@ -4,7 +4,7 @@ using ReaCS.Runtime.Core;
 
 namespace ReaCS.Tests.Shared
 {
-    public class DebounceTestSO : ObservableScriptableObject
+    public class DebounceTestSO : Data
     {
         [Observable] public Observable<int> number;
 

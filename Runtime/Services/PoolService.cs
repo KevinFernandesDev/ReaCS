@@ -4,10 +4,11 @@ using ReaCS.Runtime.Registries;
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using UnityEngine.SceneManagement;
 
 namespace ReaCS.Runtime.Services
 {
-    public class PoolService<T> : IReaCSService where T : ObservableScriptableObject
+    public class PoolService<T> : IReaCSService where T : ObservableObject
     {
         private readonly Stack<T> _pool = new();
 
@@ -17,8 +18,12 @@ namespace ReaCS.Runtime.Services
                 ? _pool.Pop()
                 : ScriptableObject.CreateInstance<T>();
 
+            instance.hideFlags = HideFlags.DontSaveInEditor | HideFlags.DontSaveInBuild;
+
             // Auto-register with IndexRegistry
             Query<IndexRegistry>().Register(instance);
+
+            Use<SceneContextService>().Register(SceneManager.GetActiveScene().name, instance);
             return instance;
         }
 
@@ -41,9 +46,9 @@ namespace ReaCS.Runtime.Services
 
         // Optional helper for links
         public TLink GetLink<TLink, TLeft, TRight>(TLeft left, TRight right)
-            where TLink : LinkSO<TLeft, TRight>, T
-            where TLeft : ObservableScriptableObject
-            where TRight : ObservableScriptableObject
+            where TLink : Link<TLeft, TRight>, T
+            where TLeft : ObservableObject
+            where TRight : ObservableObject
         {
             var link = Get() as TLink;
             link.SetLinks(left, right);

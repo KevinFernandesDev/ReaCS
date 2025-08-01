@@ -7,7 +7,7 @@ using UnityEngine;
 namespace ReaCS.Runtime.Core
 {
     public abstract class Reactor<TSO> : MonoBehaviour
-        where TSO : ObservableScriptableObject
+        where TSO : ObservableObject
     {
         private string _observedField;
         private bool _subscribed = false;
@@ -92,7 +92,7 @@ namespace ReaCS.Runtime.Core
             ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from all.");
         }
 
-        private void HandleNewSO(ObservableScriptableObject so)
+        private void HandleNewSO(ObservableObject so)
         {
             if (!Application.isPlaying) return;
             if (!IsInActiveScene()) return;
@@ -105,7 +105,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        private void HandleRemovedSO(ObservableScriptableObject so)
+        private void HandleRemovedSO(ObservableObject so)
         {
             if (!Application.isPlaying) return;
             if (this == null || !IsInActiveScene()) return;
@@ -150,7 +150,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        private void HandleChange(ObservableScriptableObject so, string fieldName)
+        private void HandleChange(ObservableObject so, string fieldName)
         {
             ReaCSDebug.Log($"[SystemBase] {GetType().Name} handling change for {fieldName}");
             if (!Application.isPlaying) return;

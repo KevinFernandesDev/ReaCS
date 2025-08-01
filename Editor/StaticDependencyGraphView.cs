@@ -39,7 +39,7 @@ namespace ReaCS.Editor
         private string currentFilter = "";
 
         // Refactoring for optimization
-        private ObservableScriptableObject[] cachedSOs = Array.Empty<ObservableScriptableObject>();
+        private ObservableObject[] cachedSOs = Array.Empty<ObservableObject>();
         private readonly Dictionary<Node, List<FlowingEdge>> edgesFromNode = new();
         private Dictionary<string, string> soNameToType = new(); // SO name ➝ type name cache
         private Dictionary<(Type, string), FieldInfo> fieldInfoCache = new(); // (Type, FieldName) ➝ FieldInfo cache                                                                              
@@ -311,8 +311,8 @@ namespace ReaCS.Editor
             fieldToSO.Clear();
             systemToSO.Clear();
 
-            cachedSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>();
-            soNameToType = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+            cachedSOs = Resources.FindObjectsOfTypeAll<ObservableObject>();
+            soNameToType = Resources.FindObjectsOfTypeAll<ObservableObject>()
                 .GroupBy(s => s.name)
                 .ToDictionary(g => g.Key, g => g.First().GetType().Name); fieldInfoCache.Clear();
 
@@ -327,7 +327,7 @@ namespace ReaCS.Editor
                 string soName = kvp.Value;
                 string fieldName = fieldId.Split('.').Last();
 
-                var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == soName);
+                var soObj = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == soName);
 
                 if (soObj == null) continue;
 
@@ -401,7 +401,7 @@ namespace ReaCS.Editor
             fieldLastChangedBySO[fieldId] = soName;
             fieldLastChangedBySO[groupedFieldId] = soName;
 
-            var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+            var soObj = Resources.FindObjectsOfTypeAll<ObservableObject>()
                       .FirstOrDefault(s => s.name == soName);
             if (soObj != null)
             {
@@ -487,7 +487,7 @@ namespace ReaCS.Editor
             return soNameToType.TryGetValue(soName, out var type) ? type : "UnknownSOType";
         }
 
-        private object TryGetFieldValue(ObservableScriptableObject so, string fieldName)
+        private object TryGetFieldValue(ObservableObject so, string fieldName)
         {
             if (so == null || string.IsNullOrEmpty(fieldName))
                 return null;
@@ -520,7 +520,7 @@ namespace ReaCS.Editor
 
         private void CorePopulate(HashSet<string> filter = null)
         {
-            var allSOs = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+            var allSOs = Resources.FindObjectsOfTypeAll<ObservableObject>()
                       .Where(so => so != null)
                       .ToArray();
             var allSystemTypes = AppDomain.CurrentDomain.GetAssemblies()
@@ -540,7 +540,7 @@ namespace ReaCS.Editor
                 if (baseSOType == null) continue;
                 if (!groupedByType.ContainsKey(baseSOType))
                 {
-                    groupedByType[baseSOType] = new List<ObservableScriptableObject>();
+                    groupedByType[baseSOType] = new List<ObservableObject>();
                 }
             }
 
@@ -555,7 +555,7 @@ namespace ReaCS.Editor
             if (filter != null)
             {
                 var allowedTypes = new HashSet<Type>(
-                    Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()
+                    Resources.FindObjectsOfTypeAll<ObservableObject>()
                         .Where(so =>
                             filter.Contains(so.name) ||
                             GetObservedFields(so).Any(f => filter.Contains($"{so.name}.{f.Name}")))
@@ -761,7 +761,7 @@ namespace ReaCS.Editor
 
 
 
-        private void CenterSOGroupToProxy(string proxyId, string groupKey, Group groupBox, List<ObservableScriptableObject> allTypeSOs)
+        private void CenterSOGroupToProxy(string proxyId, string groupKey, Group groupBox, List<ObservableObject> allTypeSOs)
         {
             schedule.Execute(() =>
             {
@@ -848,7 +848,7 @@ namespace ReaCS.Editor
             }).ExecuteLater(10);
         }
 
-        private List<FieldInfo> GetObservedFields(ObservableScriptableObject so)
+        private List<FieldInfo> GetObservedFields(ObservableObject so)
         {
             return so.GetType()
                 .GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
@@ -914,7 +914,7 @@ namespace ReaCS.Editor
 
                 if (!string.IsNullOrEmpty(soName) && !string.IsNullOrEmpty(fieldName))
                 {
-                    var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == soName);
+                    var so = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == soName);
 
                     if (so != null)
                     {
@@ -969,7 +969,7 @@ namespace ReaCS.Editor
 
                 if (!string.IsNullOrEmpty(fieldName) && !string.IsNullOrEmpty(soName))
                 {
-                    var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == soName);
+                    var so = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == soName);
                     if (so != null)
                     {
                         var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1032,7 +1032,7 @@ namespace ReaCS.Editor
                     .Where(kvp => kvp.Key.EndsWith($".{fieldName}"))
                     .Where(kvp =>
                     {
-                        var soObj = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == kvp.Value);
+                        var soObj = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == kvp.Value);
                         return soObj != null && soObj.GetType().Name == typeName;
                     });
 
@@ -1074,7 +1074,7 @@ namespace ReaCS.Editor
                 if (string.IsNullOrEmpty(fieldName) || string.IsNullOrEmpty(soName))
                     continue;
 
-                var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == soName);
+                var so = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == soName);
                 if (so == null) continue;
 
                 var field = so.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -1206,7 +1206,7 @@ namespace ReaCS.Editor
 
             foreach (var attr in reactAttributes)
             {
-                foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+                foreach (var so in Resources.FindObjectsOfTypeAll<ObservableObject>())
                 {
                     if (!soType.IsAssignableFrom(so.GetType())) continue;
 
@@ -1364,7 +1364,7 @@ namespace ReaCS.Editor
         }
         #endregion
 
-        public HashSet<string> BuildFilterSetForSO(ObservableScriptableObject so)
+        public HashSet<string> BuildFilterSetForSO(ObservableObject so)
         {
             var visible = new HashSet<string>();
             var soType = so.GetType();
@@ -1431,7 +1431,7 @@ namespace ReaCS.Editor
             var soType = systemType.BaseType?.GetGenericArguments()[0];
             if (soType == null) return visible;
 
-            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableObject>())
             {
                 if (!soType.IsAssignableFrom(so.GetType())) continue;
 
@@ -1476,7 +1476,7 @@ namespace ReaCS.Editor
 
                         if (string.IsNullOrEmpty(soName)) return;
 
-                        var so = Resources.FindObjectsOfTypeAll<ObservableScriptableObject>().FirstOrDefault(s => s.name == soName);
+                        var so = Resources.FindObjectsOfTypeAll<ObservableObject>().FirstOrDefault(s => s.name == soName);
 
                         if (so != null)
                             EditorGUIUtility.PingObject(so);

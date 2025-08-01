@@ -16,7 +16,7 @@ namespace ReaCS.Tests.Runtime
             so.name = "ValidateTest";
 
             // simulate editor validation
-            var validate = typeof(ObservableScriptableObject).GetMethod("OnValidate",
+            var validate = typeof(ObservableObject).GetMethod("OnValidate",
                 BindingFlags.Instance | BindingFlags.NonPublic);
             validate?.Invoke(so, null);
 

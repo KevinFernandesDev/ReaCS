@@ -5,7 +5,7 @@ namespace ReaCS.Runtime.Core
 {
     public class SyncObservableOnUIChange : MonoBehaviour
     {
-        public ObservableScriptableObject targetSO;
+        public ObservableObject targetSO;
 
         void Update()
         {

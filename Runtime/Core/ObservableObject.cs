@@ -20,15 +20,14 @@ namespace ReaCS.Runtime.Core
         HighFrequency   // ✅ Polled every frame
     }
 
-    public abstract class ObservableScriptableObject : ScriptableObject, IHasEntityId
+    public abstract class ObservableObject : ScriptableObject, IPoolable, ICoreRegistrable, IRegistrable
     {
-        public Observable<int> entityId = new();
-        Observable<int> IHasEntityId.entityId => entityId;
+        public EntityId entityId;
 
         [Header("ReaCS Runtime Settings")]
         public UpdateMode updateMode = UpdateMode.Default;
 
-        public event Action<ObservableScriptableObject, string> OnChanged;
+        public event Action<ObservableObject, string> OnChanged;
 
         private static readonly Dictionary<Type, List<CachedFieldInfo>> _fieldCache = new();
         private List<CachedFieldInfo> _observedFields;
@@ -38,9 +37,12 @@ namespace ReaCS.Runtime.Core
         private string lastChangedField;
 
 #if UNITY_EDITOR
-        private static readonly Dictionary<ObservableScriptableObject, Dictionary<string, object>> _defaultValueCache
+        private static readonly Dictionary<ObservableObject, Dictionary<string, object>> _defaultValueCache
             = new();
 #endif
+        // Pool setup for pool type inference via interface reference
+        private IPool _pool;
+        public void SetPool(IPool pool) => _pool = pool;
 
         // ───────────────────────────────
         // Unity Lifecycle
@@ -49,9 +51,7 @@ namespace ReaCS.Runtime.Core
         {
             InitializeFields(); // ✅ FIX: must be first to avoid HighFrequency NREs
 
-            ObservableRegistry.Register(this);
-            ObservableRuntimeWatcher.Register(this);
-            Query<IndexRegistry>().Register(this);
+            Register();
 
 #if UNITY_EDITOR
             EditorApplication.delayCall += () =>
@@ -65,14 +65,11 @@ namespace ReaCS.Runtime.Core
 
         protected virtual void OnDisable()
         {
-            ObservableRegistry.Unregister(this);
-            ObservableRuntimeWatcher.Unregister(this);
-            Query<IndexRegistry>().Unregister(this);
+            Unregister();
 
 #if !UNITY_EDITOR
             SaveStateToJson();
 #endif
-            TryReleaseToPool(); // ✅ Auto-release if runtime + pooled
         }
 
 #if UNITY_EDITOR
@@ -82,22 +79,45 @@ namespace ReaCS.Runtime.Core
         }
 #endif
 
-        private void TryReleaseToPool()
+        public virtual void Initialize()
         {
-            if (!hideFlags.HasFlag(HideFlags.DontSaveInEditor) && !hideFlags.HasFlag(HideFlags.DontSaveInBuild))
-                return;
-
-            var type = GetType();
-            var poolType = typeof(PoolService<>).MakeGenericType(type);
-
-            if (Access.TryUse(poolType, out var poolInstance))
-            {
-                var releaseMethod = poolType.GetMethod("Release");
-                releaseMethod?.Invoke(poolInstance, new object[] { this });
-                Debug.Log($"[ReaCS] Released {name} back to {poolType.Name}");
-
-            }
+            Register();
         }
+
+        public virtual void Release()
+        {
+            Unregister(); 
+            _pool?.Release(this); // Handles returning to pool
+        }
+
+        public void Register()
+        {
+            RegisterBase();
+            RegisterSelf();
+        }
+        public void Unregister()
+        {
+            UnregisterBase();
+            UnregisterSelf();
+        }
+
+        protected void RegisterBase()
+        {
+            ObservableRuntimeWatcher.Register(this);
+            ObservableRegistry.Register(this);
+            Query<IndexRegistry>().Register(this);
+        }
+        protected void UnregisterBase()
+        {
+            ObservableRuntimeWatcher.Unregister(this);
+            ObservableRegistry.Unregister(this);
+            Query<IndexRegistry>().Unregister(this);
+        }
+
+       // used in all subclasses to override specific registrations to particular registries and or pools.
+        public abstract void RegisterSelf();
+        public abstract void UnregisterSelf();
+
 
         // ───────────────────────────────
         // Initialization
@@ -269,7 +289,7 @@ namespace ReaCS.Runtime.Core
         private static void CacheDefaultValues()
         {
             _defaultValueCache.Clear();
-            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableScriptableObject>())
+            foreach (var so in Resources.FindObjectsOfTypeAll<ObservableObject>())
             {
                 if (!_defaultValueCache.ContainsKey(so))
                     _defaultValueCache[so] = new Dictionary<string, object>();
@@ -335,7 +355,7 @@ namespace ReaCS.Runtime.Core
             if (!File.Exists(path)) return;
 
             var json = File.ReadAllText(path);
-            var clone = CreateInstance(GetType()) as ObservableScriptableObject;
+            var clone = CreateInstance(GetType()) as ObservableObject;
             JsonUtility.FromJsonOverwrite(json, clone);
 
             foreach (var cached in _observedFields)
