@@ -1,5 +1,35 @@
 # 📦 Changelog
 
+# [1.2.1] - 2025-08-04
+
+### Added
+- **Full Editor support for complex `Observable<T>` field types**  
+  - Added robust drawer support for Unity UIElements style structs such as `StyleInt`, `StyleFloat`, `StyleColor`, and notably `StyleEnum<T>`.  
+  - Supported Unity’s `StyleLengthBoxed` type with correct field editing for `Length`, `LengthUnit`, and `StyleKeyword`.  
+  - Enhanced handling for Unity Localization’s `LocaleString` with dropdowns for table and entry selection in the inspector.  
+  - Editor drawer now gracefully handles standard Unity types (`Vector2`, `Vector3`, `Quaternion`, `Color`, enums, primitives) and shows a clear label for unsupported types.  
+
+- **Addressables support**  
+  - Integrated support for `AssetReference` and generic `AssetReferenceT<T>` types in editor. 
+
+### Fixed
+- **UIToolkit data binding and serialization**  
+  - Prevented UIToolkit from exposing internal `_value` backing fields of `Observable<T>`.
+  - Retained serialization of `_value` while exposing only the `[CreateProperty]` decorated `Value` property to UI Toolkit.  
+
+- **Localization error handling**  
+  - Avoided errors from empty or invalid localization table references by adding validation and fallbacks in the drawer UI.
+
+- **Editor UI fixes**   
+  - Fixed problems with asset selection persisting properly across multi-object editing sessions.
+
+### Changed
+- Switched from complex dropdown UI for addressables to Unity’s standard `ObjectField` to improve UX and reliability.
+
+### Removed
+- Removed experimental `ObservableBoxed<T>` backing field approach in favor of `_value` hiding.
+
+
 # [1.2.0] - 2025-08-01
 
 ### Added
