@@ -10,7 +10,6 @@ namespace ReaCS.Runtime.Core
         where TSO : ObservableObject
     {
         private string _observedField;
-        private bool _subscribed = false;
 
         // Utility: active scene check for runtime filtering
         private bool IsInActiveScene()
@@ -88,7 +87,6 @@ namespace ReaCS.Runtime.Core
             ObservableRegistry.OnUnregistered -= HandleRemovedSO;
 
             UnsubscribeAll();
-            _subscribed = false;
             ReaCSDebug.Log($"[ReaCS] {GetType().Name} unsubscribed from all.");
         }
 
@@ -132,8 +130,6 @@ namespace ReaCS.Runtime.Core
                     ReaCSDebug.Log($"[ReaCS] {GetType().Name} subscribed to {so.name}.{_observedField}");
                 }
             }
-
-            _subscribed = true;
         }
 
         private void UnsubscribeAll()

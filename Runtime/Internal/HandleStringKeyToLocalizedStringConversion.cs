@@ -1,3 +1,4 @@
+using ReaCS.Runtime.Core;
 using UnityEditor;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Settings;

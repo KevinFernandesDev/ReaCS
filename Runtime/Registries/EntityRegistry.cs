@@ -1,4 +1,5 @@
 using ReaCS.Runtime.Core;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using EntityId = ReaCS.Runtime.Core.EntityId;
@@ -9,7 +10,7 @@ namespace ReaCS.Runtime.Registries
     /// Flat registry for entities and associated ScriptableObjects.
     /// Maps EntityId to Transform and tracks attached SOs.
     /// </summary>
-    public sealed class EntityRegistry : IReaCSQuery
+    public sealed class EntityRegistry : IReaCSQuery, IDisposable
     {
         private readonly HashSet<EntityId> _allEntities = new();
         private readonly Dictionary<EntityId, Transform> _entityTransforms = new();
@@ -57,5 +58,13 @@ namespace ReaCS.Runtime.Registries
 
         public IEnumerable<ObservableObject> GetSOs(EntityId entityId)
             => _entityObjects.TryGetValue(entityId, out var list) ? list : System.Linq.Enumerable.Empty<ObservableObject>();
+
+        public void Dispose()
+        {
+            Debug.Log("[EntityRegistry] Disposing and clearing link map.");
+            _allEntities.Clear();
+            _entityTransforms.Clear();
+            _entityObjects.Clear();
+        }
     }
 }

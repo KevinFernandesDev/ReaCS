@@ -5,7 +5,11 @@
         "ReaCS.Runtime",
         "Unity.Burst",
         "Unity.Collections",
-        "Unity.Mathematics"
+        "Unity.Mathematics",
+        "Unity.Localization.Editor",
+        "Unity.Localization",
+        "Unity.Addressables",
+        "Unity.Addressables.Editor"
     ],
     "includePlatforms": [
         "Editor"

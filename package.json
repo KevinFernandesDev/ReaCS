@@ -1,6 +1,6 @@
 {
     "name": "com.kevinfernandesdev.reacs",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "displayName": "ReaCS - Reactive Component System",
     "description": "A lightweight ECS-inspired reactive data model using ScriptableObjects.",
     "unity": "6.0",
@@ -16,7 +16,9 @@
         "com.unity.testtools.codecoverage": "1.2.6",
         "com.unity.collections": "2.5.7",
         "com.unity.mathematics":"1.3.2",
-        "com.unity.burst":"1.8.23"
+        "com.unity.burst":"1.8.23",
+        "com.unity.localization":"1.5.5",
+        "com.unity.addressables":"2.4.6"
     },    
     "samples": [
         {

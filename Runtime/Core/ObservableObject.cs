@@ -33,7 +33,6 @@ namespace ReaCS.Runtime.Core
         private List<CachedFieldInfo> _observedFields;
         private Dictionary<string, object> _cachedValues = new();
 
-        private bool _isDirty = false;
         private string lastChangedField;
 
 #if UNITY_EDITOR
@@ -176,7 +175,6 @@ namespace ReaCS.Runtime.Core
         public void MarkDirty(string fieldName)
         {
             lastChangedField = fieldName;
-            _isDirty = true;
 
             if (updateMode == UpdateMode.Default)
                 ObservableRuntimeWatcher.NotifyDirty(this, fieldName);
@@ -200,7 +198,6 @@ namespace ReaCS.Runtime.Core
                 }
                 break;
             }
-            _isDirty = false;
         }
 
         internal void ProcessAllFields()
@@ -218,7 +215,6 @@ namespace ReaCS.Runtime.Core
                     OnChanged?.Invoke(this, cached.Field.Name);
                 }
             }
-            _isDirty = false;
         }
 
         /// <summary>

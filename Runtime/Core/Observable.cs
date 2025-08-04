@@ -14,7 +14,7 @@ namespace ReaCS.Runtime.Core
 
         [NonSerialized] private ObservableObject owner;
         [NonSerialized] private string fieldName;
-        [SerializeField] public T _value;
+        private T _value;
 
         private static readonly bool _enableDebug =
 #if UNITY_EDITOR

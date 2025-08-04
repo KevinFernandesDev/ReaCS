@@ -14,8 +14,8 @@ namespace ReaCS.Runtime.Core
      where TLeft : ObservableObject
      where TRight : ObservableObject
     {
-        public ObservableSO<TLeft> LeftSO = new();
-        public ObservableSO<TRight> RightSO = new();
+        [Observable] public ObservableObjectReference<TLeft> LeftSO = new();
+        [Observable] public ObservableObjectReference<TRight> RightSO = new();
 
         public override ObservableObject Left => LeftSO.Value;
         public override ObservableObject Right => RightSO.Value;

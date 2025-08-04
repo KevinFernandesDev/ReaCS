@@ -2,10 +2,11 @@ using ReaCS.Runtime.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace ReaCS.Runtime.Registries
 {
-    public class TagRegistry : Registry<Tag>
+    public class TagRegistry : Registry<Tag>, IDisposable
     {
         private readonly Dictionary<Type, HashSet<Tag>> _tagsByType = new();
 
@@ -56,6 +57,13 @@ namespace ReaCS.Runtime.Registries
                     foreach (var tag in tagSet)
                         yield return (TTag)tag;
             }
+        }
+
+        public void Dispose()
+        {
+            Debug.Log("[TagRegistry] Disposing and clearing link map.");
+            _tagsByType.Clear();
+            Clear();
         }
     }
 }

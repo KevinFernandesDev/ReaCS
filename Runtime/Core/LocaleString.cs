@@ -3,7 +3,7 @@ using System;
 using UnityEngine.Localization;
 #endif
 
-namespace ReaCS.Runtime.Internal
+namespace ReaCS.Runtime.Core
 {
     [Serializable]
     public struct LocaleString
