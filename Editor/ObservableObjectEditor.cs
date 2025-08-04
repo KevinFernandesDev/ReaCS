@@ -13,6 +13,7 @@ using UnityEngine.UIElements;
 using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEngine.AddressableAssets;
+using UnityEngine.Localization.Tables;
 
 namespace ReaCS.Editor
 {
@@ -21,6 +22,9 @@ namespace ReaCS.Editor
     public class ObservableObjectEditor : UnityEditor.Editor
     {
         private List<FieldInfo> observableFields;
+        // --- Smart String Editor-only variable storage ---
+        private Dictionary<string, string> smartVarValues = new();
+        private Dictionary<string, UnityEngine.Object> smartVarObjects = new();
 
         protected virtual void OnEnable()
         {
@@ -188,24 +192,30 @@ namespace ReaCS.Editor
             // --- LocaleString Support ---
             if (type == typeof(LocaleString))
             {
-                var tableField = type.GetField("table");
-                var entryField = type.GetField("entry");
-
-                string table = (string)tableField.GetValue(value);
-                string entry = (string)entryField.GetValue(value);
-
-                string[] tables = GetAllLocalizationTableNames();
-                int selectedTable = Mathf.Max(0, Array.IndexOf(tables, table));
-                if (selectedTable < 0) selectedTable = 0;
-                table = tables.Length > 0 ? tables[selectedTable] : "";
-
-                string[] entries = GetAllLocalizationEntryKeys(table);
-                int selectedEntry = Mathf.Max(0, Array.IndexOf(entries, entry));
-                if (selectedEntry < 0) selectedEntry = 0;
-
                 EditorGUILayout.BeginVertical("box");
                 EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
 
+                // --- Unwrap Observable<LocaleString> ---
+                var sampleObservable = backingField?.GetValue(targets[0]);
+                var sampleLocaleString = sampleObservable?.GetType().GetProperty("Value")?.GetValue(sampleObservable) as LocaleString;
+                if (sampleLocaleString == null)
+                {
+                    EditorGUILayout.HelpBox("LocaleString is null or unreadable.", MessageType.Warning);
+                    return value;
+                }
+
+                // Table & entry
+                string[] tables = GetAllLocalizationTableNames();
+                int selectedTable = Mathf.Max(0, Array.IndexOf(tables, sampleLocaleString.table));
+                if (selectedTable < 0) selectedTable = 0;
+                string table = tables.Length > 0 ? tables[selectedTable] : "";
+
+                string[] entries = GetAllLocalizationEntryKeys(table);
+                int selectedEntry = Mathf.Max(0, Array.IndexOf(entries, sampleLocaleString.entry));
+                if (selectedEntry < 0) selectedEntry = 0;
+                string entry = entries.Length > 0 ? entries[selectedEntry] : "";
+
+                // Table popup
                 EditorGUI.BeginChangeCheck();
                 selectedTable = EditorGUILayout.Popup("Table", selectedTable, tables);
                 if (EditorGUI.EndChangeCheck())
@@ -220,6 +230,7 @@ namespace ReaCS.Editor
                     table = tables[selectedTable];
                 }
 
+                // Entry popup or text
                 if (entries.Length > 0)
                 {
                     selectedEntry = EditorGUILayout.Popup("Key", selectedEntry, entries);
@@ -229,17 +240,94 @@ namespace ReaCS.Editor
                 {
                     entry = EditorGUILayout.TextField("Key", entry);
                 }
-                EditorGUILayout.EndVertical();
 
-                if (table != (string)tableField.GetValue(value) || entry != (string)entryField.GetValue(value))
+                // Write table/entry to all selected objects
+                foreach (var obj in targets)
                 {
-                    LocaleString newStruct = (LocaleString)value;
-                    newStruct.table = table;
-                    newStruct.entry = entry;
-                    return newStruct;
+                    var observable = backingField?.GetValue(obj);
+                    var ls = observable?.GetType().GetProperty("Value")?.GetValue(observable) as LocaleString;
+                    if (ls != null)
+                    {
+                        ls.table = table;
+                        ls.entry = entry;
+                        EditorUtility.SetDirty(obj);
+                    }
                 }
+
+                // Smart string vars
+                if (!string.IsNullOrEmpty(table) && !string.IsNullOrEmpty(entry))
+                {
+                    var smartVars = LocalizationSmartStringUtil.GetSmartVariablesForEntry(table, entry);
+                    if (smartVars.Count > 0)
+                    {
+                        EditorGUILayout.HelpBox("Smart String Variables: " + string.Join(", ", smartVars), MessageType.Info);
+
+                        foreach (var varName in smartVars)
+                        {
+                            EditorGUILayout.BeginHorizontal();
+
+                            string currentVal = sampleLocaleString.Variables.TryGetValue(varName, out var val) ? val?.ToString() ?? "" : "";
+                            string newVal = EditorGUILayout.TextField(varName, currentVal, GUILayout.MinWidth(80));
+
+                            if (newVal != currentVal)
+                            {
+                                foreach (var obj in targets)
+                                {
+                                    var observable = backingField?.GetValue(obj);
+                                    var ls = observable?.GetType().GetProperty("Value")?.GetValue(observable) as LocaleString;
+                                    if (ls != null)
+                                    {
+                                        ls.SetVariable(varName, newVal);
+                                        EditorUtility.SetDirty(obj);
+                                    }
+                                }
+                            }
+
+                            EditorGUILayout.EndHorizontal();
+                        }
+
+                        // --- Preview ---
+                        var formatter = UnityEngine.Localization.Settings.LocalizationSettings.StringDatabase.SmartFormatter;
+                        string rawStr = "";
+                        var collection = UnityEditor.Localization.LocalizationEditorSettings.GetStringTableCollections()
+                            .FirstOrDefault(col => col.TableCollectionName == table);
+                        var stringTable = collection?.StringTables.FirstOrDefault() as UnityEngine.Localization.Tables.StringTable;
+                        var stringEntry = stringTable?.GetEntry(entry);
+                        if (stringEntry != null)
+                            rawStr = stringEntry.Value;
+
+                        var data = new Dictionary<string, object>(sampleLocaleString.Variables);
+                        try
+                        {
+                            string preview = formatter.Format(rawStr, data);
+                            foreach (var obj in targets)
+                            {
+                                var observable = backingField?.GetValue(obj);
+                                var ls = observable?.GetType().GetProperty("Value")?.GetValue(observable) as LocaleString;
+                                if (ls != null)
+                                    ls.editorPreview = preview;
+                            }
+
+                            EditorGUILayout.HelpBox("Preview: " + preview, MessageType.None);
+                        }
+                        catch
+                        {
+                            EditorGUILayout.HelpBox("Smart string formatting error", MessageType.Warning);
+                        }
+                    }
+                    else
+                    {
+                        EditorGUILayout.HelpBox("No Smart String variables detected.", MessageType.None);
+                    }
+                }
+
+                EditorGUILayout.EndVertical();
                 return value;
             }
+
+
+
+
 
             // --- Robust StyleEnum<T> support ---
             if (type != null && type.IsGenericType && type.GetGenericTypeDefinition().Name.StartsWith("StyleEnum"))
