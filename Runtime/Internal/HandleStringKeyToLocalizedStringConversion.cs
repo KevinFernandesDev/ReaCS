@@ -1,8 +1,12 @@
 using ReaCS.Runtime.Core;
-using UnityEditor;
+using UnityEngine;
 using UnityEngine.Localization;
 using UnityEngine.Localization.Settings;
 using UnityEngine.UIElements;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace ReaCS.Runtime.Internal
 {
@@ -11,11 +15,12 @@ namespace ReaCS.Runtime.Internal
 #if UNITY_EDITOR
         [InitializeOnLoadMethod]
 #else
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        [RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
 #endif
         public static void RegisterConverters()
         {
             var group = new ConverterGroup("LocalizeStringKey");
+
             group.AddConverter((ref string value) =>
             {
                 var tableName = string.IsNullOrEmpty(LocalizationSettings.SelectedLocale?.Identifier.Code)
@@ -30,6 +35,7 @@ namespace ReaCS.Runtime.Internal
                 var localizedString = new LocalizedString(locale.table, locale.entry);
                 return localizedString.GetLocalizedString();
             });
+
             ConverterGroups.RegisterConverterGroup(group);
         }
     }

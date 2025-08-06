@@ -117,7 +117,7 @@ namespace ReaCS.Runtime.Registries
             return null;
         }
 
-        public IEnumerable<DataAdapterBase<TData>> GetAllBindings()
+        public IEnumerable<DataAdapterBase<TData>> GetAllDataAdapters()
         {
             foreach (var list in _map.Values)
                 foreach (var b in list)

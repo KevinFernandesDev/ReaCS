@@ -65,4 +65,13 @@ namespace ReaCS.Runtime.Core
     {
         void Connect(ObservableObject left, ObservableObject right);
     }
+
+    public interface IHasFastHash
+    {
+        /// <summary>
+        /// Returns the current fast hash value without modifying internal state.
+        /// </summary>
+        int FastHashValue { get; }
+    }
+
 }

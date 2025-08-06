@@ -43,6 +43,18 @@ namespace ReaCS.Editor
 
         public override void OnInspectorGUI()
         {
+            if (GUILayout.Button("🧹 Invalidate Saved Snapshot"))
+            {
+                foreach (var obj in targets)
+                {
+                    if (obj is ObservableObject so)
+                    {
+                        so.BumpSnapshotVersion();
+                        Debug.Log($"[ReaCS] Bumped snapshot version for: {so.name}");
+                    }
+                }
+            }
+
             serializedObject.Update();
 
             EditorGUILayout.LabelField("Observables", EditorStyles.boldLabel);

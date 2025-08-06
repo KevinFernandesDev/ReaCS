@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ReaCS.Runtime.Internal;
+using System;
 using System.Collections.Generic;
 using Unity.Burst;
 using Unity.Collections;
@@ -13,21 +14,17 @@ namespace ReaCS.Runtime.Core
         private static ObservableRuntimeWatcher _instance;
         private static bool _isInitialized = false;
 
-        private static Dictionary<ObservableObject, int> _objectToId = new();
-        private static List<ObservableObject> _idToObject = new();
+        private static Dictionary<IHasFastHash, int> _observableToId = new();
+        private static List<IHasFastHash> _idToObservable = new();
 
-        // ✅ Event-driven dirty fields
-        private static List<(int, string)> _dirtyFields = new(256);
-
-        // ✅ HighFrequency Burst job data
-        private static NativeArray<float> _previousHashes;
-        private static NativeArray<float> _currentHashes;
+        private static NativeArray<int> _previousHashes;
+        private static NativeArray<int> _currentHashes;
         private static NativeArray<byte> _dirtyFlags;
         private static int _capacity = 1024;
         private static int _registeredCount = 0;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        internal static void Init()
+        public static void Init()
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying) return;
@@ -47,7 +44,6 @@ namespace ReaCS.Runtime.Core
             _isInitialized = true;
         }
 
-
         private static void AllocateNativeArrays(int newSize)
         {
             var oldPrev = _previousHashes;
@@ -56,14 +52,14 @@ namespace ReaCS.Runtime.Core
 
             int oldCount = oldPrev.IsCreated ? oldPrev.Length : 0;
 
-            _previousHashes = new NativeArray<float>(newSize, Allocator.Persistent);
-            _currentHashes = new NativeArray<float>(newSize, Allocator.Persistent);
+            _previousHashes = new NativeArray<int>(newSize, Allocator.Persistent);
+            _currentHashes = new NativeArray<int>(newSize, Allocator.Persistent);
             _dirtyFlags = new NativeArray<byte>(newSize, Allocator.Persistent);
 
             if (oldCount > 0)
             {
-                NativeArray<float>.Copy(oldPrev, _previousHashes, oldCount);
-                NativeArray<float>.Copy(oldCurr, _currentHashes, oldCount);
+                NativeArray<int>.Copy(oldPrev, _previousHashes, oldCount);
+                NativeArray<int>.Copy(oldCurr, _currentHashes, oldCount);
                 NativeArray<byte>.Copy(oldDirty, _dirtyFlags, oldCount);
 
                 oldPrev.Dispose();
@@ -72,74 +68,54 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        public static void Register(ObservableObject so)
+        public static void Register(IHasFastHash observable)
         {
 #if UNITY_EDITOR
             if (!Application.isPlaying && !UnityEditor.EditorApplication.isPlayingOrWillChangePlaymode) return;
 #else
-    if (!Application.isPlaying) return;
+            if (!Application.isPlaying) return;
 #endif
             if (!_isInitialized) Init();
-            if (_objectToId.ContainsKey(so)) return;
+            if (_observableToId.ContainsKey(observable)) return;
 
             int id = _registeredCount;
-            _objectToId[so] = id;
-            _idToObject.Add(so);
+            _observableToId[observable] = id;
+            _idToObservable.Add(observable);
             _registeredCount++;
 
-            // ✅ Ensure arrays are allocated before use
             if (!_previousHashes.IsCreated || id >= _previousHashes.Length)
             {
                 _capacity = Mathf.Max(_capacity * 2, id + 1);
                 AllocateNativeArrays(_capacity);
             }
 
-            float hash = so.updateMode == UpdateMode.HighFrequency ? so.ComputeFastHash() : 0f;
+            int hash = observable.FastHashValue;
             _previousHashes[id] = hash;
             _currentHashes[id] = hash;
             _dirtyFlags[id] = 0;
         }
 
-
-        public static void Unregister(ObservableObject so)
+        public static void Unregister(IHasFastHash observable)
         {
-            if (!_objectToId.TryGetValue(so, out int id)) return;
+            if (!_observableToId.TryGetValue(observable, out int id)) return;
 
-            _objectToId.Remove(so);
-            if (id < _idToObject.Count)
-                _idToObject[id] = null;
-
-            for (int i = _dirtyFields.Count - 1; i >= 0; i--)
-            {
-                if (_dirtyFields[i].Item1 == id)
-                    _dirtyFields.RemoveAt(i);
-            }
+            _observableToId.Remove(observable);
+            if (id < _idToObservable.Count)
+                _idToObservable[id] = null;
 
             if (_previousHashes.IsCreated && id < _previousHashes.Length)
             {
-                _previousHashes[id] = 0f;
-                _currentHashes[id] = 0f;
+                _previousHashes[id] = 0;
+                _currentHashes[id] = 0;
                 _dirtyFlags[id] = 0;
             }
-        }
-
-        public static void NotifyDirty(ObservableObject so, string fieldName)
-        {
-            if (!_objectToId.TryGetValue(so, out int id)) return;
-
-            for (int i = 0; i < _dirtyFields.Count; i++)
-            {
-                if (_dirtyFields[i].Item1 == id && _dirtyFields[i].Item2 == fieldName)
-                    return;
-            }
-            _dirtyFields.Add((id, fieldName));
         }
 
         [BurstCompile]
         private struct CheckChangesJob : IJobParallelFor
         {
-            [ReadOnly] public NativeArray<float> Previous;
-            [ReadOnly] public NativeArray<float> Current;
+            [ReadOnly] public NativeArray<int> Previous;
+            [ReadOnly] public NativeArray<int> Current;
             public NativeArray<byte> DirtyFlags;
 
             public void Execute(int index)
@@ -155,41 +131,18 @@ namespace ReaCS.Runtime.Core
 #endif
             if (_registeredCount == 0) return;
 
-            // ✅ Process Event-Driven Dirty Fields
-            for (int i = 0; i < _dirtyFields.Count; i++)
-            {
-                int soId = _dirtyFields[i].Item1;
-                string fieldName = _dirtyFields[i].Item2;
-
-                if (soId >= 0 && soId < _idToObject.Count)
-                {
-                    var so = _idToObject[soId];
-                    so?.ProcessFieldChange(fieldName);
-                }
-            }
-            _dirtyFields.Clear();
-
-            // ✅ Update hashes only for HighFrequency SOs
             for (int i = 0; i < _registeredCount; i++)
             {
-                var so = _idToObject[i];
-                if (so == null || so.updateMode != UpdateMode.HighFrequency)
+                var obs = _idToObservable[i];
+                if (obs == null)
                 {
                     _currentHashes[i] = _previousHashes[i];
                     continue;
                 }
 
-                try
-                {
-                    _currentHashes[i] = so.ComputeFastHash();
-                }
-                catch
-                {
-                    _currentHashes[i] = 0f;
-                }
+                _currentHashes[i] = obs.FastHashValue;
             }
 
-            // ✅ Run Burst Parallel Job
             var job = new CheckChangesJob
             {
                 Previous = _previousHashes,
@@ -198,14 +151,12 @@ namespace ReaCS.Runtime.Core
             };
             job.Schedule(_registeredCount, 64).Complete();
 
-            // ✅ Apply Changes for Dirty HighFrequency SOs
             for (int i = 0; i < _registeredCount; i++)
             {
                 if (_dirtyFlags[i] == 1)
                 {
-                    var so = _idToObject[i];
-                    if (so != null)
-                        so.ProcessAllFields();
+                    if (_idToObservable[i] is ObservableBase baseObs)
+                        baseObs.NotifyChanged();
 
                     _previousHashes[i] = _currentHashes[i];
                     _dirtyFlags[i] = 0;
@@ -220,22 +171,9 @@ namespace ReaCS.Runtime.Core
             if (_dirtyFlags.IsCreated) _dirtyFlags.Dispose();
 
             _isInitialized = false;
-            _objectToId.Clear();
-            _idToObject.Clear();
-            _dirtyFields.Clear();
+            _observableToId.Clear();
+            _idToObservable.Clear();
             _registeredCount = 0;
         }
-
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-        public static void ForceUpdateAll()
-        {
-            for (int i = 0; i < _idToObject.Count; i++)
-            {
-                var so = _idToObject[i];
-                if (so == null) continue;
-                so.ProcessAllFields();
-            }
-        }
-#endif
     }
 }

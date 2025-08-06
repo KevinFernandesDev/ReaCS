@@ -18,11 +18,11 @@ namespace ReaCS.Editor
             {
                 if (EditorUtility.IsPersistent(so)) continue; // only runtime-bound assets
                 ObservableRegistry.Register(so);
-                ObservableRuntimeWatcher.Register(so);
+                // No need to re-register with ObservableRuntimeWatcher — handled per-field now
             }
 
             ReaCSDebug.Log($"[ReaCS] ♻️ Rehydrated {all.Length} ObservableScriptableObjects for runtime play mode.");
         }
     }
-#endif
 }
+#endif

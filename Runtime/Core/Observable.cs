@@ -8,19 +8,23 @@ using UnityEngine;
 namespace ReaCS.Runtime.Core
 {
     [Serializable]
-    public class Observable<T> : IInitializableObservable
+    public class Observable<T> : ObservableBase, IInitializableObservable
     {
         [SerializeField] public bool ShouldPersist = false;
 
         [NonSerialized] private ObservableObject owner;
         [NonSerialized] private string fieldName;
-        private T _value;
+
+        [SerializeField] private T _value;
+
+        private int _lastHash;
+        private int _fastHashValue;
 
         private static readonly bool _enableDebug =
 #if UNITY_EDITOR
-        true;
+            true;
 #else
-        false;
+            false;
 #endif
 
         private static readonly bool _logHistory = true;
@@ -36,6 +40,12 @@ namespace ReaCS.Runtime.Core
         {
             this.owner = owner;
             this.fieldName = fieldName;
+            _fastHashValue = ComputeValueHash(_value);
+            _lastHash = _fastHashValue;
+
+            // Register self with per-field runtime watcher
+            if (Application.isPlaying)
+                ObservableRuntimeWatcher.Register(this);
         }
 
         [CreateProperty]
@@ -49,14 +59,16 @@ namespace ReaCS.Runtime.Core
 #endif
                 if (!Equals(_value, value))
                 {
-                    var oldValue = _value;
+                    var old = _value;
                     _value = value;
 
+                    _fastHashValue = ComputeValueHash(value);
+                    _lastHash = _fastHashValue;
+
                     if (_logHistory && Application.isPlaying)
-                        LogToBurstHistory(oldValue, value);
+                        LogToBurstHistory(old, value);
 
                     _onChanged?.Invoke(value);
-                    owner?.MarkDirty(fieldName);
 
 #if UNITY_EDITOR
                     ObservableRegistry.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
@@ -65,9 +77,30 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        public void SyncFromBinding()
+        // ───────────────────────────────
+        // ObservableBase Implementation
+        // ───────────────────────────────
+        public override int FastHashValue => _fastHashValue;
+
+        public override void NotifyChanged()
         {
-            Value = _value;
+            _onChanged?.Invoke(_value);
+#if UNITY_EDITOR
+            ObservableRegistry.OnEditorFieldChanged?.Invoke(owner?.name ?? "null", fieldName);
+#endif
+        }
+
+        // ───────────────────────────────
+        // Helpers
+        // ───────────────────────────────
+        public void SyncFromBinding() => Value = _value;
+
+        private static int ComputeValueHash(T val)
+        {
+            if (val is UnityEngine.Object unityObj)
+                return unityObj ? unityObj.GetInstanceID() : 0;
+
+            return val?.GetHashCode() ?? 0;
         }
 
         private void LogToBurstHistory(T oldVal, T newVal)

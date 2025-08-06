@@ -47,8 +47,8 @@ namespace ReaCS.Editor
             var leftField = linkType.GetField("Left");
             var rightField = linkType.GetField("Right");
 
-            var observableLeft = Activator.CreateInstance(typeof(ObservableObjectReference<>).MakeGenericType(leftType));
-            var observableRight = Activator.CreateInstance(typeof(ObservableObjectReference<>).MakeGenericType(rightType));
+            var observableLeft = Activator.CreateInstance(typeof(ObservableReference<>).MakeGenericType(leftType));
+            var observableRight = Activator.CreateInstance(typeof(ObservableReference<>).MakeGenericType(rightType));
 
             var valueProp = observableLeft.GetType().GetProperty("Value");
             valueProp.SetValue(observableLeft, left);

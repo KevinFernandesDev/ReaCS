@@ -1,12 +1,12 @@
 ﻿using ReaCS.Runtime.Internal;
 using ReaCS.Runtime.Registries;
+using ReaCS.Runtime.Services;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using UnityEngine;
 using static ReaCS.Runtime.Access;
-using ReaCS.Runtime.Services;
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -14,49 +14,33 @@ using UnityEditor;
 
 namespace ReaCS.Runtime.Core
 {
-    public enum UpdateMode
-    {
-        Default,        // ✅ Event-driven
-        HighFrequency   // ✅ Polled every frame
-    }
-
     public abstract class ObservableObject : ScriptableObject, IPoolable, ICoreRegistrable, IRegistrable
     {
         public EntityId entityId;
-
-        [Header("ReaCS Runtime Settings")]
-        public UpdateMode updateMode = UpdateMode.Default;
-
         public event Action<ObservableObject, string> OnChanged;
+
+        [SerializeField, HideInInspector] private int snapshotVersion = 1;
+        public int SnapshotVersion => snapshotVersion;
 
         private static readonly Dictionary<Type, List<CachedFieldInfo>> _fieldCache = new();
         private List<CachedFieldInfo> _observedFields;
         private Dictionary<string, object> _cachedValues = new();
-
-        private string lastChangedField;
-
-#if UNITY_EDITOR
-        private static readonly Dictionary<ObservableObject, Dictionary<string, object>> _defaultValueCache
-            = new();
-#endif
-        // Pool setup for pool type inference via interface reference
         private IPool _pool;
+
         public void SetPool(IPool pool) => _pool = pool;
 
-        // ───────────────────────────────
-        // Unity Lifecycle
-        // ───────────────────────────────
-        protected virtual void OnEnable()
-        {
-            InitializeFields(); // ✅ FIX: must be first to avoid HighFrequency NREs
+#if UNITY_EDITOR
+        private static readonly Dictionary<ObservableObject, Dictionary<string, object>> _defaultValueCache = new();
+#endif
 
+        public virtual void OnEnable()
+        {
+            InitializeFields();
             Register();
 
 #if UNITY_EDITOR
-            EditorApplication.delayCall += () =>
-            {
-                if (this) LoadStateFromJson();
-            };
+            if (EditorApplication.isPlaying)
+                LoadStateFromJson();
 #else
             LoadStateFromJson();
 #endif
@@ -66,61 +50,43 @@ namespace ReaCS.Runtime.Core
         {
             Unregister();
 
-#if !UNITY_EDITOR
+#if UNITY_EDITOR
+            if (EditorApplication.isPlaying)
+                SaveStateToJson();
+#else
             SaveStateToJson();
 #endif
         }
 
 #if UNITY_EDITOR
-        protected virtual void OnValidate()
-        {
-            ProcessAllFields();
-        }
+        protected virtual void OnValidate() => ProcessAllFields();
 #endif
 
-        public virtual void Initialize()
-        {
-            Register();
-        }
+        public virtual void Initialize() => Register();
 
         public virtual void Release()
         {
-            Unregister(); 
-            _pool?.Release(this); // Handles returning to pool
+            Unregister();
+            _pool?.Release(this);
         }
 
         public void Register()
         {
-            RegisterBase();
+            ObservableRegistry.Register(this);
+            Query<IndexRegistry>().Register(this);
             RegisterSelf();
         }
+
         public void Unregister()
         {
-            UnregisterBase();
+            ObservableRegistry.Unregister(this);
+            Query<IndexRegistry>().Unregister(this);
             UnregisterSelf();
         }
 
-        protected void RegisterBase()
-        {
-            ObservableRuntimeWatcher.Register(this);
-            ObservableRegistry.Register(this);
-            Query<IndexRegistry>().Register(this);
-        }
-        protected void UnregisterBase()
-        {
-            ObservableRuntimeWatcher.Unregister(this);
-            ObservableRegistry.Unregister(this);
-            Query<IndexRegistry>().Unregister(this);
-        }
-
-       // used in all subclasses to override specific registrations to particular registries and or pools.
         public abstract void RegisterSelf();
         public abstract void UnregisterSelf();
 
-
-        // ───────────────────────────────
-        // Initialization
-        // ───────────────────────────────
         private void InitializeFields()
         {
             Type type = GetType();
@@ -130,9 +96,7 @@ namespace ReaCS.Runtime.Core
                 cachedFields = new();
                 foreach (var field in type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
                 {
-                    if (!Attribute.IsDefined(field, typeof(ObservableAttribute)) &&
-                        !Attribute.IsDefined(field, typeof(ObservableSavedAttribute)))
-                        continue;
+                    if (!Attribute.IsDefined(field, typeof(ObservableAttribute))) continue;
 
                     var valueProp = field.FieldType.GetProperty("Value");
                     var persistField = field.FieldType.GetField("ShouldPersist", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
@@ -144,7 +108,6 @@ namespace ReaCS.Runtime.Core
                         ShouldPersistField = persistField
                     });
                 }
-
                 _fieldCache[type] = cachedFields;
             }
 
@@ -169,17 +132,6 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        // ───────────────────────────────
-        // Dirty Tracking
-        // ───────────────────────────────
-        public void MarkDirty(string fieldName)
-        {
-            lastChangedField = fieldName;
-
-            if (updateMode == UpdateMode.Default)
-                ObservableRuntimeWatcher.NotifyDirty(this, fieldName);
-        }
-
         internal void ProcessFieldChange(string fieldName)
         {
             if (_observedFields == null || _cachedValues == null) return;
@@ -191,10 +143,10 @@ namespace ReaCS.Runtime.Core
                 var obs = cached.Field.GetValue(this);
                 var newValue = cached.ValueProperty?.GetValue(obs);
 
-                if (!_cachedValues.TryGetValue(cached.Field.Name, out var oldValue) || !Equals(oldValue, newValue))
+                if (!_cachedValues.TryGetValue(fieldName, out var oldValue) || !Equals(oldValue, newValue))
                 {
-                    _cachedValues[cached.Field.Name] = newValue;
-                    OnChanged?.Invoke(this, cached.Field.Name);
+                    _cachedValues[fieldName] = newValue;
+                    OnChanged?.Invoke(this, fieldName);
                 }
                 break;
             }
@@ -217,68 +169,30 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        /// <summary>
-        /// Lightweight deterministic hash for HighFrequency update mode.
-        /// </summary>
-        public float ComputeFastHash()
-        {
-            if (_observedFields == null) return 0f;
-
-            unchecked
-            {
-                int hash = 17;
-                for (int i = 0; i < _observedFields.Count; i++)
-                {
-                    var cached = _observedFields[i];
-                    var obs = cached.Field.GetValue(this);
-                    var val = cached.ValueProperty?.GetValue(obs);
-                    hash = hash * 31 + (val?.GetHashCode() ?? 0);
-                }
-                return hash;
-            }
-        }
-
-        // ✅ HighFrequency support (now null-safe)
         internal IEnumerable<string> GetObservedFieldNames()
         {
             if (_observedFields == null) yield break;
-
-            for (int i = 0; i < _observedFields.Count; i++)
-                yield return _observedFields[i].Field.Name;
+            foreach (var cached in _observedFields)
+                yield return cached.Field.Name;
         }
 
         internal object GetObservedFieldValue(string fieldName)
         {
             if (_observedFields == null) return null;
-
-            for (int i = 0; i < _observedFields.Count; i++)
-            {
-                if (_observedFields[i].Field.Name == fieldName)
-                {
-                    var obs = _observedFields[i].Field.GetValue(this);
-                    return _observedFields[i].ValueProperty?.GetValue(obs);
-                }
-            }
+            foreach (var cached in _observedFields)
+                if (cached.Field.Name == fieldName)
+                    return cached.ValueProperty?.GetValue(cached.Field.GetValue(this));
             return null;
         }
 
-        // ───────────────────────────────
-        // PlayMode Reset (Non-persistent Fields)
-        // ───────────────────────────────
 #if UNITY_EDITOR
         [InitializeOnLoadMethod]
         private static void SetupEditorResetHook()
         {
             EditorApplication.playModeStateChanged += state =>
             {
-                if (state == PlayModeStateChange.EnteredPlayMode)
-                {
-                    CacheDefaultValues();
-                }
-                else if (state == PlayModeStateChange.ExitingPlayMode)
-                {
-                    RestoreDefaultValues();
-                }
+                if (state == PlayModeStateChange.EnteredPlayMode) CacheDefaultValues();
+                else if (state == PlayModeStateChange.ExitingPlayMode) RestoreDefaultValues();
             };
         }
 
@@ -288,13 +202,13 @@ namespace ReaCS.Runtime.Core
             foreach (var so in Resources.FindObjectsOfTypeAll<ObservableObject>())
             {
                 if (!_defaultValueCache.ContainsKey(so))
-                    _defaultValueCache[so] = new Dictionary<string, object>();
+                    _defaultValueCache[so] = new();
 
                 foreach (var cached in so._observedFields ?? new List<CachedFieldInfo>())
                 {
                     var obs = cached.Field.GetValue(so);
-                    var currentVal = cached.ValueProperty?.GetValue(obs);
-                    _defaultValueCache[so][cached.Field.Name] = currentVal;
+                    var val = cached.ValueProperty?.GetValue(obs);
+                    _defaultValueCache[so][cached.Field.Name] = val;
                 }
             }
         }
@@ -309,31 +223,27 @@ namespace ReaCS.Runtime.Core
                 {
                     if (cached.ShouldPersistField == null) continue;
 
-                    bool shouldPersist = (bool)(cached.ShouldPersistField
-                        .GetValue(cached.Field.GetValue(so)) ?? false);
+                    bool shouldPersist = (bool)(cached.ShouldPersistField.GetValue(cached.Field.GetValue(so)) ?? false);
 
-                    if (!shouldPersist &&
-                        _defaultValueCache[so].TryGetValue(cached.Field.Name, out var defaultVal))
+                    if (!shouldPersist && _defaultValueCache[so].TryGetValue(cached.Field.Name, out var val))
                     {
-                        var targetObs = cached.Field.GetValue(so);
+                        var obs = cached.Field.GetValue(so);
                         ObservablePlayModeGuard.Suppress = true;
-                        cached.ValueProperty?.SetValue(targetObs, defaultVal);
+                        cached.ValueProperty?.SetValue(obs, val);
                         ObservablePlayModeGuard.Suppress = false;
                     }
                 }
             }
-
             _defaultValueCache.Clear();
         }
 #endif
 
-        // ───────────────────────────────
-        // Persistence
-        // ───────────────────────────────
         private string GetSavePath()
         {
 #if UNITY_EDITOR
-            return Path.Combine("Temp", name + "_snapshot.json");
+            return EditorApplication.isPlaying
+                ? Path.Combine(Application.persistentDataPath, name + "_state.json")
+                : Path.Combine("Temp", name + "_snapshot.json");
 #else
             return Path.Combine(Application.persistentDataPath, name + "_state.json");
 #endif
@@ -343,49 +253,77 @@ namespace ReaCS.Runtime.Core
         {
             var json = JsonUtility.ToJson(this);
             File.WriteAllText(GetSavePath(), json);
+            PlayerPrefs.SetInt(name + "_snapshot_version", snapshotVersion);
         }
+
+        private static bool _isLoadingJson = false;
 
         public void LoadStateFromJson()
         {
-            string path = GetSavePath();
-            if (!File.Exists(path)) return;
+            if (_isLoadingJson) return;
+            _isLoadingJson = true;
 
-            var json = File.ReadAllText(path);
-            var clone = CreateInstance(GetType()) as ObservableObject;
-            JsonUtility.FromJsonOverwrite(json, clone);
-
-            foreach (var cached in _observedFields)
+            try
             {
-                var field = cached.Field;
+                string path = GetSavePath();
+                if (!File.Exists(path)) return;
 
-                var sourceObs = field.GetValue(clone);
-                var targetObs = field.GetValue(this);
-
-                if (sourceObs == null || targetObs == null) continue;
-
-                bool shouldPersist = cached.ShouldPersistField != null &&
-                                     (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
-
-                if (shouldPersist)
+                string versionKey = name + "_snapshot_version";
+                int savedVersion = PlayerPrefs.GetInt(versionKey, -1);
+                if (savedVersion != snapshotVersion)
                 {
-                    var value = cached.ValueProperty?.GetValue(sourceObs);
-                    cached.ValueProperty?.SetValue(targetObs, value);
+                    File.Delete(path);
+                    PlayerPrefs.SetInt(versionKey, snapshotVersion);
+                    Debug.Log($"[ReaCS] Snapshot invalidated for {name} (v{savedVersion} → v{snapshotVersion})");
+                    return;
                 }
-            }
 
-            ObservableRuntimeWatcher.Unregister(clone);
-            ObservableRegistry.Unregister(clone);
+                var json = File.ReadAllText(path);
+                var clone = ScriptableObject.CreateInstance(GetType()) as ObservableObject;
+                if (clone == null) return;
 
+                JsonUtility.FromJsonOverwrite(json, clone);
+
+                foreach (var cached in _observedFields)
+                {
+                    var field = cached.Field;
+                    var sourceObs = field.GetValue(clone);
+                    var targetObs = field.GetValue(this);
+
+                    if (sourceObs == null || targetObs == null) continue;
+
+                    bool shouldPersist = cached.ShouldPersistField != null &&
+                                         (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
+
+                    if (shouldPersist)
+                    {
+                        var value = cached.ValueProperty?.GetValue(sourceObs);
+                        cached.ValueProperty?.SetValue(targetObs, value);
+                    }
+                }
+
+                ObservableRegistry.Unregister(clone);
 #if UNITY_EDITOR
-            DestroyImmediate(clone);
+                DestroyImmediate(clone);
 #else
-            Destroy(clone);
+                Destroy(clone);
 #endif
+            }
+            finally
+            {
+                _isLoadingJson = false;
+            }
         }
 
-        // ───────────────────────────────
-        // Internal Types
-        // ───────────────────────────────
+#if UNITY_EDITOR
+        public void BumpSnapshotVersion()
+        {
+            snapshotVersion++;
+            EditorUtility.SetDirty(this);
+            AssetDatabase.SaveAssets();
+        }
+#endif
+
         private class CachedFieldInfo
         {
             public FieldInfo Field;

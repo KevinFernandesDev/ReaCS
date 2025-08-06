@@ -8,7 +8,7 @@ namespace ReaCS.Tests.Shared
         [Observable] public Observable<int> number;
         public int hiddenField = 999;
 
-        protected override void OnEnable()
+        public override void OnEnable()
         {
             base.OnEnable();
             number.Init(this, nameof(number));

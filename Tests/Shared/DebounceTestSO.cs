@@ -11,7 +11,7 @@ namespace ReaCS.Tests.Shared
         public event Action OnTestChanged;
         public int CheckCount { get; private set; }
 
-        protected override void OnEnable()
+        public override void OnEnable()
         {
             base.OnEnable();
             number.Init(this, nameof(number));
@@ -29,7 +29,7 @@ namespace ReaCS.Tests.Shared
         public void TriggerChange(int newValue)
         {
             number.Value = newValue;
-            MarkDirty(number.ToString());
+            //MarkDirty(number.ToString());
         }
 
         // Optional method for debugging test flow
