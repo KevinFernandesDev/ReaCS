@@ -1,5 +1,97 @@
 # 📦 Changelog
 
+# [1.2.2] - 2025-08-06
+
+### Added
+- **Burst-optimized ObservableRuntimeWatcher**  
+  - Fully rewritten runtime watcher with Burst-compatible job system to track and notify observable changes with runtime execution on CPU going from ~1.5ms to **<0.03ms**, hitting easily 400fps on a small app and zero GC calls.  
+  - Now uses fast hashing to detect field-level changes without boxing or allocations.  
+  - Only reacts to actual value changes, getting rid of false-positive updates.
+
+  - **Reactor<T>.Update() loop**  
+  - Added new runtime `Reactor<T>` logic to allow per-entity reactive logic without traditional `SystemBase` overhead.  
+  - Automatically reacts to changes in any observable field of TSO with zero GC and minimal scheduling cost.
+
+- **Profiler-friendly structure**  
+  - ReaCS systems now appear clearly in Unity Profiler under `Reactor<T>.Update()` and `ObservableRuntimeWatcher.Update()` nodes.  
+  - Includes job handle visualization and accurate per-frame duration breakdown.
+
+- **Runtime field-level hashing and Burst-powered watcher**  
+  - `Observable<T>` now implements `IHasFastHash` with per-field `FastHashValue`, enabling fine-grained change detection.  
+  - Introduced per-object `ObservableRuntimeWatcher` using `NativeArray<int>` and `IJobParallelFor` via Burst to efficiently detect SO field changes each frame.  
+  - Automatically registers all active `ObservableObject` instances and compares their combined field hashes in parallel.  
+  - Fallback-safe hash handling for nulls, UnityEngine.Objects, and value types.
+
+- **Zero-allocation runtime SO field change detection**  
+  - No GC allocations or per-frame boxing during runtime change detection.  
+  - All `Observable<T>` field changes are tracked using native memory and Burst-friendly hashing.
+
+  - **Snapshot versioning system for `ObservableObject` persistence**  
+  - Added `snapshotVersion` field to all `ObservableObject` assets.  
+  - Automatically invalidates outdated JSON saves by comparing saved version with current one.  
+  - Uses `PlayerPrefs` to track snapshot versions per asset name at runtime.
+  - If a mismatch is detected, saved data is cleared and the current version is recorded.  
+
+- **Inspector and project menu tools for snapshot management**  
+  - Added an "🧹 Invalidate Saved Snapshot" button in the Inspector of any `ObservableObject`.  
+  - Supports multi-selection to invalidate multiple assets at once.  
+  - Added right-click project menu under "ReaCS" for quick access to bulk snapshot invalidation.
+
+### Changed
+- **Per-object tracking replaces per-field registration**  
+  - Removed individual `Observable<T>` runtime registration in favor of `ObservableObject.ComputeFastHash()` covering all fields.  
+  - `Observable<T>.IsDirty` and `ClearDirty()` now work purely via local hashing without needing a global registry.
+
+- **Optimized Update loop using Burst**  
+  - Used a single Burst-compiled job (`CheckChangesJob`) to compare all registered ScriptableObject hashes per frame in parallel.
+
+- **Lean fallback mode for Editor**  
+  - Editor mode skips runtime registration to avoid conflicts or false positives during prefab/asset editing.
+
+- `Observable<T>` now internally caches its hash and only propagates if the hash changes.  
+- `OnChanged` callbacks now run only when the new value differs from the previous one.  
+- Runtime loop decoupled from Unity’s `ScriptableObject` update logic for better job scheduling.
+- Refactored `ObservableObject.LoadStateFromJson()` to safely skip snapshot loading if version is outdated, improving stability across versions and builds.
+
+
+### Fixed
+- **Runtime memory growth**  
+  - Dynamic array reallocation with capacity doubling to avoid excessive growth and ensure stable performance in large projects.
+
+- **Crash on SO deletion or recompile**  
+  - Safely skips or nulls out invalidated `ObservableObject` references in the runtime hash checker to avoid null dereferences or index errors.
+  
+- **Massive performance optimization**  
+  - Reduced runtime watcher overhead from ~1.5ms to **<0.03ms** in live builds by ditching event-based change reaction to fully bursted change reaction for all observables.  
+  - Eliminated CPU stalls during idle frames by removing unnecessary registry or reflection calls.
+  
+- **Editor vs Runtime separation**  
+  - Ensured the Editor-only tracking system and static graph have no impact on runtime performance.  
+  - ReaCSFieldHistory and pulse animation systems now properly skip work outside of play mode.
+
+- **False-positive field updates**  
+  - Improved value hashing logic for `Observable<T>` to prevent update spam on fields like Vector3 or float that changed by epsilon.
+
+  - **Build-time deserialization for `Observable<T>` fields**  
+  - Added `[SerializeField]` to the internal `_value` field in `Observable<T>` to ensure Unity serializes it into builds.  
+  - Fixed issue where all values appeared reset to default in builds due to Unity not serializing generic field state.
+
+- **Playmode persistence isolation**  
+  - Ensured that snapshot JSON files are only loaded in playmode or runtime to avoid overwriting Inspector-edited values in the editor.  
+  - Fixed behavior where stale runtime snapshots were overriding new Inspector values on build.
+
+- **Reactor reliability in builds**  
+  - Confirmed and fixed field persistence issues that were preventing `Reactor<T>` classes from triggering correctly in builds.
+
+
+### Removed
+- ❌ Removed per-field runtime registration via `ObservableRuntimeWatcher.Register<T>()`. Now handled via parent object hash only.
+- Removed previous timestamp-based field pulse tracking system in favor of a fast `activeChangedNodes` set.  
+- Deprecated heavy per-frame `Resources.FindObjectsOfTypeAll<ObservableScriptableObject>()` scan, now replaced with persistent SO cache.
+- Removed `EditorApplication.delayCall` JSON load workaround to prevent unintended state overrides in edit mode.
+
+
+
 # [1.2.1] - 2025-08-04
 
 ### Added
