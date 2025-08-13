@@ -7,37 +7,37 @@ namespace ReaCS.Runtime.Core
     [Serializable]
     public class StyleTranslateBoxed
     {
-        public Vector2 position = Vector2.zero;
-        public float z = 0f;
+        [Observable] public Observable<float> x = new();
+        [Observable] public Observable<float> y = new();
+        [Observable] public Observable<float> z = new();
 
-        public LengthUnit unitX = LengthUnit.Pixel;
-        public LengthUnit unitY = LengthUnit.Pixel;
+        [Observable] public Observable<LengthUnit> unitX = new() { Value = LengthUnit.Pixel };
+        [Observable] public Observable<LengthUnit> unitY = new() { Value = LengthUnit.Pixel };
 
-        public StyleKeyword keyword = StyleKeyword.Undefined;
+        [Observable] public Observable<StyleKeyword> keyword = new() { Value = StyleKeyword.Undefined };
 
         public StyleTranslate ToStyleTranslate()
         {
             return new StyleTranslate
             {
                 value = new Translate(
-                    new Length(position.x, unitX),
-                    new Length(position.y, unitY),
-                    z
+                    new Length(x.Value, unitX.Value),
+                    new Length(y.Value, unitY.Value),
+                    z.Value
                 ),
-                keyword = keyword
+                keyword = keyword.Value
             };
         }
 
         public void FromStyleTranslate(StyleTranslate styleTranslate)
         {
-            position = new Vector2(
-                styleTranslate.value.x.value,
-                styleTranslate.value.y.value
-            );
-            z = styleTranslate.value.z;
-            unitX = styleTranslate.value.x.unit;
-            unitY = styleTranslate.value.y.unit;
-            keyword = styleTranslate.keyword;
+            x.Value = styleTranslate.value.x.value;
+            y.Value = styleTranslate.value.y.value;
+            z.Value = styleTranslate.value.z;
+
+            unitX.Value = styleTranslate.value.x.unit;
+            unitY.Value = styleTranslate.value.y.unit;
+            keyword.Value = styleTranslate.keyword;
         }
 
         public static implicit operator StyleTranslate(StyleTranslateBoxed b) => b?.ToStyleTranslate() ?? default;
