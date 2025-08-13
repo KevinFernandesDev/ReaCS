@@ -444,22 +444,26 @@ namespace ReaCS.Editor
             {
                 var boxed = (StyleTranslateBoxed)value ?? new StyleTranslateBoxed();
 
+                EditorGUILayout.BeginVertical("box");
                 EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
                 EditorGUI.indentLevel++;
 
-                boxed.x = EditorGUILayout.FloatField("X", boxed.x);
-                boxed.unitX = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX);
+                boxed.position = EditorGUILayout.Vector2Field("Position (X,Y)", boxed.position);
 
-                boxed.y = EditorGUILayout.FloatField("Y", boxed.y);
+                EditorGUILayout.BeginHorizontal();
+                boxed.unitX = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX);
                 boxed.unitY = (LengthUnit)EditorGUILayout.EnumPopup("Y Unit", boxed.unitY);
+                EditorGUILayout.EndHorizontal();
 
                 boxed.z = EditorGUILayout.FloatField("Z", boxed.z);
                 boxed.keyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", boxed.keyword);
 
                 EditorGUI.indentLevel--;
+                EditorGUILayout.EndVertical();
 
                 return boxed;
             }
+
 
 
 
