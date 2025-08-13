@@ -448,15 +448,16 @@ namespace ReaCS.Editor
                 EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
                 EditorGUI.indentLevel++;
 
-                boxed.position = EditorGUILayout.Vector2Field("Position (X,Y)", boxed.position);
+                // Position
+                boxed.x.Value = EditorGUILayout.FloatField("X", boxed.x.Value);
+                boxed.unitX.Value = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX.Value);
 
-                EditorGUILayout.BeginHorizontal();
-                boxed.unitX = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX);
-                boxed.unitY = (LengthUnit)EditorGUILayout.EnumPopup("Y Unit", boxed.unitY);
-                EditorGUILayout.EndHorizontal();
+                boxed.y.Value = EditorGUILayout.FloatField("Y", boxed.y.Value);
+                boxed.unitY.Value = (LengthUnit)EditorGUILayout.EnumPopup("Y Unit", boxed.unitY.Value);
 
-                boxed.z = EditorGUILayout.FloatField("Z", boxed.z);
-                boxed.keyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", boxed.keyword);
+                // Z + keyword
+                boxed.z.Value = EditorGUILayout.FloatField("Z", boxed.z.Value);
+                boxed.keyword.Value = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", boxed.keyword.Value);
 
                 EditorGUI.indentLevel--;
                 EditorGUILayout.EndVertical();
