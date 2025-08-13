@@ -22,12 +22,9 @@ namespace ReaCS.Editor.Internal
 
             group.AddConverter((ref XYValue data) =>
             {
-                if (data == null)
-                    return new StyleTranslate();
-
                 return new StyleTranslate(new Translate(
-                    new Length(data.X, LengthUnit.Pixel),
-                    new Length(data.Y, LengthUnit.Pixel),
+                    new Length(data.x, LengthUnit.Pixel),
+                    new Length(data.y, LengthUnit.Pixel),
                     0f));
             });
 
