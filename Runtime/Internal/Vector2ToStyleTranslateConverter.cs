@@ -31,3 +31,4 @@ namespace ReaCS.Editor.Internal
             ConverterGroups.RegisterConverterGroup(group);
         }
     }
+}
