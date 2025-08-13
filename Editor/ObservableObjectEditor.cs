@@ -440,6 +440,7 @@ namespace ReaCS.Editor
             }
 
 
+
             // --- AssetReference Support ---
             if (value is AssetReference assetRef)
             {
@@ -482,7 +483,17 @@ namespace ReaCS.Editor
                 return assetRef;
             }
 
+            // --- Support for Observable<XYValue> ---
+            if (value?.GetType().Name == "XYValue")
+            {
+                var xy = (XYValue)value;
+                Vector2 newVec = EditorGUILayout.Vector2Field(label, new Vector2(xy.x, xy.y));
 
+                if (!Mathf.Approximately(newVec.x, xy.x) || !Mathf.Approximately(newVec.y, xy.y))
+                    return new XYValue { x = newVec.x, y = newVec.y };
+
+                return value;
+            }
 
             // --- ObjectField support for Observable<T> where T : UnityEngine.Object ---
             if (value is UnityEngine.Object objVal)
