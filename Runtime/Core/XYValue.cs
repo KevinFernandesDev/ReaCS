@@ -4,9 +4,9 @@ using UnityEngine;
 namespace ReaCS.Runtime.Core
 {
     [Serializable]
-    public struct XYValue
+    public class XYValue
     {
-        public float x;
-        public float y;
+        [Observable] public Observable<float> X = new();
+        [Observable] public Observable<float> Y = new();
     }
 }

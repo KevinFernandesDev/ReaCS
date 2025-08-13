@@ -9,7 +9,7 @@ using UnityEditor;
 
 namespace ReaCS.Editor.Internal
 {
-    public static class HandleXYValueConversion
+    public static class Vector2ToStyleTranslateConverter
     {
 #if UNITY_EDITOR
         [InitializeOnLoadMethod]
@@ -18,17 +18,16 @@ namespace ReaCS.Editor.Internal
 #endif
         public static void Register()
         {
-            var group = new ConverterGroup("XYValue");
+            var group = new ConverterGroup("Vector2ToStyleTranslate");
 
-            group.AddConverter((ref XYValue data) =>
+            group.AddConverter((ref Vector2 v) =>
             {
                 return new StyleTranslate(new Translate(
-                    new Length(data.x, LengthUnit.Pixel),
-                    new Length(data.y, LengthUnit.Pixel),
+                    new Length(v.x, LengthUnit.Pixel),
+                    new Length(v.y, LengthUnit.Pixel),
                     0f));
             });
 
             ConverterGroups.RegisterConverterGroup(group);
         }
     }
-}
