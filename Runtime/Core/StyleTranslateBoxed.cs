@@ -7,11 +7,12 @@ namespace ReaCS.Runtime.Core
     [Serializable]
     public class StyleTranslateBoxed
     {
-        public float x = 0f;
-        public float y = 0f;
+        public Vector2 position = Vector2.zero;
         public float z = 0f;
+
         public LengthUnit unitX = LengthUnit.Pixel;
         public LengthUnit unitY = LengthUnit.Pixel;
+
         public StyleKeyword keyword = StyleKeyword.Undefined;
 
         public StyleTranslate ToStyleTranslate()
@@ -19,8 +20,8 @@ namespace ReaCS.Runtime.Core
             return new StyleTranslate
             {
                 value = new Translate(
-                    new Length(x, unitX),
-                    new Length(y, unitY),
+                    new Length(position.x, unitX),
+                    new Length(position.y, unitY),
                     z
                 ),
                 keyword = keyword
@@ -29,8 +30,10 @@ namespace ReaCS.Runtime.Core
 
         public void FromStyleTranslate(StyleTranslate styleTranslate)
         {
-            x = styleTranslate.value.x.value;
-            y = styleTranslate.value.y.value;
+            position = new Vector2(
+                styleTranslate.value.x.value,
+                styleTranslate.value.y.value
+            );
             z = styleTranslate.value.z;
             unitX = styleTranslate.value.x.unit;
             unitY = styleTranslate.value.y.unit;
