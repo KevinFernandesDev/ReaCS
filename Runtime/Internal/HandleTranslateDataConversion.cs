@@ -9,7 +9,7 @@ using UnityEditor;
 
 namespace ReaCS.Editor.Internal
 {
-    public static class HandleTranslateDataConversion
+    public static class HandleXYValueConversion
     {
 #if UNITY_EDITOR
         [InitializeOnLoadMethod]
@@ -18,16 +18,16 @@ namespace ReaCS.Editor.Internal
 #endif
         public static void Register()
         {
-            var group = new ConverterGroup("TranslateData");
+            var group = new ConverterGroup("XYValue");
 
-            group.AddConverter((ref TranslateData data) =>
+            group.AddConverter((ref XYValue data) =>
             {
                 if (data == null)
                     return new StyleTranslate();
 
                 return new StyleTranslate(new Translate(
-                    new Length(data.X.Value, LengthUnit.Pixel),
-                    new Length(data.Y.Value, LengthUnit.Pixel),
+                    new Length(data.X, LengthUnit.Pixel),
+                    new Length(data.Y, LengthUnit.Pixel),
                     0f));
             });
 
