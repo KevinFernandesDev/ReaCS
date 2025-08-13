@@ -439,6 +439,53 @@ namespace ReaCS.Editor
                 return value;
             }
 
+            // --- StyleTranslate Support ---
+            if (type != null && type.FullName == "UnityEngine.UIElements.StyleTranslate")
+            {
+                var valueProp = type.GetProperty("value");
+                var keywordProp = type.GetProperty("keyword");
+
+                if (valueProp == null || keywordProp == null)
+                {
+                    EditorGUILayout.LabelField(label, "Unsupported StyleTranslate (missing properties)");
+                    return value;
+                }
+
+                var currentTranslate = (Translate)valueProp.GetValue(value);
+                var currentKeyword = (StyleKeyword)keywordProp.GetValue(value);
+
+                EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+                EditorGUI.indentLevel++;
+
+                // Draw X/Y/Z fields
+                var x = currentTranslate.x.value;
+                var y = currentTranslate.y.value;
+                var z = currentTranslate.z;
+
+                EditorGUILayout.BeginHorizontal();
+                x = EditorGUILayout.FloatField("X", x);
+                y = EditorGUILayout.FloatField("Y", y);
+                z = EditorGUILayout.FloatField("Z", z);
+                EditorGUILayout.EndHorizontal();
+
+                // Draw keyword enum
+                var newKeyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", currentKeyword);
+
+                EditorGUI.indentLevel--;
+
+                var newTranslate = new Translate(
+                    new Length(x, currentTranslate.x.unit),
+                    new Length(y, currentTranslate.y.unit),
+                    z
+                );
+
+                object newStruct = Activator.CreateInstance(type);
+                valueProp.SetValue(newStruct, newTranslate);
+                keywordProp.SetValue(newStruct, newKeyword);
+
+                return newStruct;
+            }
+
             // --- AssetReference Support ---
             // --- AssetReference Support ---
             if (value is AssetReference assetRef)
