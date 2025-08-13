@@ -439,36 +439,7 @@ namespace ReaCS.Editor
                 return value;
             }
 
-            // --- StyleTranslateBoxed Support ---
-            if (type == typeof(StyleTranslateBoxed))
-            {
-                var boxed = (StyleTranslateBoxed)value ?? new StyleTranslateBoxed();
 
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
-                EditorGUI.indentLevel++;
-
-                // Position
-                boxed.x.Value = EditorGUILayout.FloatField("X", boxed.x.Value);
-                boxed.unitX.Value = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX.Value);
-
-                boxed.y.Value = EditorGUILayout.FloatField("Y", boxed.y.Value);
-                boxed.unitY.Value = (LengthUnit)EditorGUILayout.EnumPopup("Y Unit", boxed.unitY.Value);
-
-                // Z + keyword
-                boxed.z.Value = EditorGUILayout.FloatField("Z", boxed.z.Value);
-                boxed.keyword.Value = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", boxed.keyword.Value);
-
-                EditorGUI.indentLevel--;
-                EditorGUILayout.EndVertical();
-
-                return boxed;
-            }
-
-
-
-
-            // --- AssetReference Support ---
             // --- AssetReference Support ---
             if (value is AssetReference assetRef)
             {
