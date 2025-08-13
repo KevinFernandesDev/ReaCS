@@ -457,7 +457,6 @@ namespace ReaCS.Editor
                 EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
                 EditorGUI.indentLevel++;
 
-                // Draw X/Y/Z fields
                 var x = currentTranslate.x.value;
                 var y = currentTranslate.y.value;
                 var z = currentTranslate.z;
@@ -468,7 +467,6 @@ namespace ReaCS.Editor
                 z = EditorGUILayout.FloatField("Z", z);
                 EditorGUILayout.EndHorizontal();
 
-                // Draw keyword enum
                 var newKeyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", currentKeyword);
 
                 EditorGUI.indentLevel--;
@@ -485,6 +483,7 @@ namespace ReaCS.Editor
 
                 return newStruct;
             }
+
 
             // --- AssetReference Support ---
             // --- AssetReference Support ---
