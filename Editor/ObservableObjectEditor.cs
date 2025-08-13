@@ -439,50 +439,28 @@ namespace ReaCS.Editor
                 return value;
             }
 
-            // --- StyleTranslate Support ---
-            if (type != null && type.FullName == "UnityEngine.UIElements.StyleTranslate")
+            // --- StyleTranslateBoxed Support ---
+            if (type == typeof(StyleTranslateBoxed))
             {
-                var valueProp = type.GetProperty("value");
-                var keywordProp = type.GetProperty("keyword");
-
-                if (valueProp == null || keywordProp == null)
-                {
-                    EditorGUILayout.LabelField(label, "Unsupported StyleTranslate (missing properties)");
-                    return value;
-                }
-
-                var currentTranslate = (Translate)valueProp.GetValue(value);
-                var currentKeyword = (StyleKeyword)keywordProp.GetValue(value);
+                var boxed = (StyleTranslateBoxed)value ?? new StyleTranslateBoxed();
 
                 EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
                 EditorGUI.indentLevel++;
 
-                var x = currentTranslate.x.value;
-                var y = currentTranslate.y.value;
-                var z = currentTranslate.z;
+                boxed.x = EditorGUILayout.FloatField("X", boxed.x);
+                boxed.unitX = (LengthUnit)EditorGUILayout.EnumPopup("X Unit", boxed.unitX);
 
-                EditorGUILayout.BeginHorizontal();
-                x = EditorGUILayout.FloatField("X", x);
-                y = EditorGUILayout.FloatField("Y", y);
-                z = EditorGUILayout.FloatField("Z", z);
-                EditorGUILayout.EndHorizontal();
+                boxed.y = EditorGUILayout.FloatField("Y", boxed.y);
+                boxed.unitY = (LengthUnit)EditorGUILayout.EnumPopup("Y Unit", boxed.unitY);
 
-                var newKeyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", currentKeyword);
+                boxed.z = EditorGUILayout.FloatField("Z", boxed.z);
+                boxed.keyword = (StyleKeyword)EditorGUILayout.EnumPopup("Keyword", boxed.keyword);
 
                 EditorGUI.indentLevel--;
 
-                var newTranslate = new Translate(
-                    new Length(x, currentTranslate.x.unit),
-                    new Length(y, currentTranslate.y.unit),
-                    z
-                );
-
-                object newStruct = Activator.CreateInstance(type);
-                valueProp.SetValue(newStruct, newTranslate);
-                keywordProp.SetValue(newStruct, newKeyword);
-
-                return newStruct;
+                return boxed;
             }
+
 
 
             // --- AssetReference Support ---

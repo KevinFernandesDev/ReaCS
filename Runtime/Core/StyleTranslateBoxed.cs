@@ -1,35 +1,48 @@
 using UnityEngine;
+using UnityEngine.UIElements;
+using System;
 
 namespace ReaCS.Runtime.Core
 {
-    using UnityEngine;
-    using UnityEngine.UIElements;
-    using System;
-
     [Serializable]
     public class StyleTranslateBoxed
     {
-        public StyleTranslate Value;
+        public float x = 0f;
+        public float y = 0f;
+        public float z = 0f;
+        public LengthUnit unitX = LengthUnit.Pixel;
+        public LengthUnit unitY = LengthUnit.Pixel;
+        public StyleKeyword keyword = StyleKeyword.Undefined;
 
-        public StyleTranslateBoxed()
+        public StyleTranslate ToStyleTranslate()
         {
-            Value = new StyleTranslate
+            return new StyleTranslate
             {
-                value = new Translate(new Length(0f), new Length(0f), 0f),
-                keyword = StyleKeyword.Undefined
+                value = new Translate(
+                    new Length(x, unitX),
+                    new Length(y, unitY),
+                    z
+                ),
+                keyword = keyword
             };
         }
 
-        public StyleTranslateBoxed(StyleTranslate v)
+        public void FromStyleTranslate(StyleTranslate styleTranslate)
         {
-            Value = v;
+            x = styleTranslate.value.x.value;
+            y = styleTranslate.value.y.value;
+            z = styleTranslate.value.z;
+            unitX = styleTranslate.value.x.unit;
+            unitY = styleTranslate.value.y.unit;
+            keyword = styleTranslate.keyword;
         }
 
-        public static implicit operator StyleTranslate(StyleTranslateBoxed b)
-            => b?.Value ?? default;
-
+        public static implicit operator StyleTranslate(StyleTranslateBoxed b) => b?.ToStyleTranslate() ?? default;
         public static implicit operator StyleTranslateBoxed(StyleTranslate v)
-            => new StyleTranslateBoxed(v);
+        {
+            var b = new StyleTranslateBoxed();
+            b.FromStyleTranslate(v);
+            return b;
+        }
     }
-
 }
