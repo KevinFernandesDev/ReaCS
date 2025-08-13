@@ -12,21 +12,22 @@ namespace ReaCS.Runtime.Core
         public Observable<float> z = new();
         public Observable<StyleKeyword> keyword = new();
 
-        public StyleTranslate ToStyleTranslate()
+        [field: SerializeField]
+        [field: CreateProperty] // This makes it bindable in UI Toolkit
+        public StyleTranslate Value
         {
-            return new StyleTranslate
+            get => new StyleTranslate
             {
                 value = new Translate(x.Value.value, y.Value.value, z.Value),
                 keyword = keyword.Value
             };
-        }
-
-        public void SetFrom(StyleTranslate translate)
-        {
-            x.Value = new StyleLength(translate.value.x);
-            y.Value = new StyleLength(translate.value.y);
-            z.Value = translate.value.z;
-            keyword.Value = translate.keyword;
+            set
+            {
+                x.Value = new StyleLength(value.value.x);
+                y.Value = new StyleLength(value.value.y);
+                z.Value = value.value.z;
+                keyword.Value = value.keyword;
+            }
         }
     }
 }
