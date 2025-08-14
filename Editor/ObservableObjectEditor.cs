@@ -519,38 +519,49 @@ namespace ReaCS.Editor
                     var enumerable = value as IEnumerable;
                     var asList = enumerable?.Cast<object>().ToList() ?? new List<object>();
 
-                    int toRemove = -1;
+                    int removeIndex = -1;
                     for (int i = 0; i < asList.Count; i++)
                     {
-                        EditorGUILayout.BeginHorizontal();
-                        object item = asList[i];
-                        object newItem = DrawSingleValue($"[{i}]", item, innerType);
+                        bool inline = IsInlineRenderableType(innerType);
 
-                        if (!Equals(item, newItem))
-                            asList[i] = newItem;
+                        if (inline)
+                        {
+                            EditorGUILayout.BeginHorizontal();
+                            object newItem = DrawSingleValue($"[{i}]", asList[i], innerType);
+                            if (!Equals(newItem, asList[i])) asList[i] = newItem;
+                            if (GUILayout.Button("✖", GUILayout.Width(22))) removeIndex = i;
+                            EditorGUILayout.EndHorizontal();
+                        }
+                        else
+                        {
+                            // Complex: let it take full width (no Horizontal wrapper!)
+                            asList[i] = DrawSingleValue($"[{i}]", asList[i], innerType);
 
-                        if (GUILayout.Button("✖", GUILayout.Width(22)))
-                            toRemove = i;
-                        EditorGUILayout.EndHorizontal();
+                            // Put the remove button under the block
+                            EditorGUILayout.BeginHorizontal();
+                            GUILayout.FlexibleSpace();
+                            if (GUILayout.Button("Remove", GUILayout.Width(70))) removeIndex = i;
+                            EditorGUILayout.EndHorizontal();
+                            EditorGUILayout.Space(2);
+                        }
                     }
 
-                    if (toRemove >= 0)
-                        asList.RemoveAt(toRemove);
+                    if (removeIndex >= 0) asList.RemoveAt(removeIndex);
 
                     if (GUILayout.Button("+ Add Element"))
                         asList.Add(CreateDefault(innerType));
 
                     EditorGUILayout.EndVertical();
 
-                    // Repack into collection
+                    // Repack into the collection
                     object newCollection = Activator.CreateInstance(type);
                     var addMethod = type.GetMethod("Add");
-                    foreach (var item in asList)
-                        addMethod.Invoke(newCollection, new object[] { item });
+                    foreach (var item in asList) addMethod.Invoke(newCollection, new object[] { item });
 
                     return newCollection;
                 }
             }
+
 
             // --- Generic struct support for Observable<T> where T is a struct ---
             if (type != null && type.IsValueType && !type.IsPrimitive && !type.IsEnum)
@@ -675,6 +686,23 @@ namespace ReaCS.Editor
                 return DrawStruct(label, value, type, depth);
             }
 
+            if (type == typeof(System.Guid))
+            {
+                string s = (value is System.Guid g && g != System.Guid.Empty) ? g.ToString() : "";
+                EditorGUILayout.BeginHorizontal();
+                string newS = EditorGUILayout.DelayedTextField(label, s);
+                if (GUILayout.Button("↻", GUILayout.Width(24)))
+                {
+                    return System.Guid.NewGuid();
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (newS != s && System.Guid.TryParse(newS, out var parsed))
+                    return parsed;
+
+                return value ?? System.Guid.Empty;
+            }
+
             // Fallback
             EditorGUILayout.LabelField(label, $"Unsupported element type: {type.Name}");
             return value;
@@ -683,6 +711,9 @@ namespace ReaCS.Editor
 
         private object CreateDefault(Type type)
         {
+            if (type == typeof(string)) return "";
+            if (type == typeof(System.Guid)) return System.Guid.NewGuid();
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type)) return null; // leave null, user will pick
             if (type.IsValueType) return Activator.CreateInstance(type);
             return null;
         }
@@ -733,6 +764,22 @@ namespace ReaCS.Editor
             return boxed;
         }
 
+        private static bool IsInlineRenderableType(Type t)
+        {
+            if (typeof(UnityEngine.Object).IsAssignableFrom(t)) return true;
+            if (t.IsEnum) return true;
+
+            // basics
+            if (t == typeof(string) || t == typeof(int) || t == typeof(float) || t == typeof(bool)) return true;
+
+            // common Unity structs that draw in one line
+            if (t == typeof(Vector2) || t == typeof(Vector3) || t == typeof(Vector4) || t == typeof(Color) || t == typeof(Quaternion)) return true;
+
+            // everything else that's a user struct should be treated as multi-line
+            if (t.IsValueType && !t.IsPrimitive && !t.IsEnum) return false;
+
+            return false;
+        }
     }
 }
 #endif
