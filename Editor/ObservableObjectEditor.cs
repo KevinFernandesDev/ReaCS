@@ -1,5 +1,6 @@
 ﻿#if UNITY_EDITOR
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
 using System;
 using System.Reflection;
@@ -14,6 +15,7 @@ using UnityEditor.AddressableAssets;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Localization.Tables;
+using System.Collections;
 
 namespace ReaCS.Editor
 {
@@ -502,6 +504,53 @@ namespace ReaCS.Editor
             if (value is AudioClip audioVal)
                 return EditorGUILayout.ObjectField(label, audioVal, typeof(AudioClip), false);
 
+            // --- Collection support: Observable<List<T>> or Observable<HashSet<T>> ---
+            if (type != null && type.IsGenericType)
+            {
+                var listType = type.GetGenericTypeDefinition();
+                if (listType == typeof(List<>) || listType == typeof(HashSet<>))
+                {
+                    Type innerType = type.GetGenericArguments()[0];
+                    EditorGUILayout.BeginVertical("box");
+                    EditorGUILayout.LabelField(label, EditorStyles.boldLabel);
+
+                    var enumerable = value as IEnumerable;
+                    var asList = enumerable?.Cast<object>().ToList() ?? new List<object>();
+
+                    int toRemove = -1;
+                    for (int i = 0; i < asList.Count; i++)
+                    {
+                        EditorGUILayout.BeginHorizontal();
+                        object item = asList[i];
+                        object newItem = DrawSingleValue($"[{i}]", item, innerType);
+
+                        if (!Equals(item, newItem))
+                            asList[i] = newItem;
+
+                        if (GUILayout.Button("✖", GUILayout.Width(22)))
+                            toRemove = i;
+                        EditorGUILayout.EndHorizontal();
+                    }
+
+                    if (toRemove >= 0)
+                        asList.RemoveAt(toRemove);
+
+                    if (GUILayout.Button("+ Add Element"))
+                        asList.Add(CreateDefault(innerType));
+
+                    EditorGUILayout.EndVertical();
+
+                    // Repack into collection
+                    object newCollection = Activator.CreateInstance(type);
+                    var addMethod = type.GetMethod("Add");
+                    foreach (var item in asList)
+                        addMethod.Invoke(newCollection, new object[] { item });
+
+                    return newCollection;
+                }
+            }
+
+
             // --- Standard primitives ---
             if (value is float rawFloatVal)
             {
@@ -575,6 +624,36 @@ namespace ReaCS.Editor
             return new string[0];
 #endif
         }
+
+        private object DrawSingleValue(string label, object value, Type type)
+        {
+            if (type == typeof(string))
+                return EditorGUILayout.TextField(label, value as string ?? "");
+            if (type == typeof(int))
+                return EditorGUILayout.IntField(label, value is int i ? i : 0);
+            if (type == typeof(float))
+                return EditorGUILayout.FloatField(label, value is float f ? f : 0f);
+            if (type == typeof(bool))
+                return EditorGUILayout.Toggle(label, value is bool b && b);
+            if (type == typeof(Vector2))
+                return EditorGUILayout.Vector2Field(label, value is Vector2 v ? v : Vector2.zero);
+            if (type == typeof(Vector3))
+                return EditorGUILayout.Vector3Field(label, value is Vector3 v ? v : Vector3.zero);
+            if (type == typeof(Color))
+                return EditorGUILayout.ColorField(label, value is Color c ? c : Color.white);
+            if (type.IsEnum)
+                return EditorGUILayout.EnumPopup(label, (Enum)value);
+
+            EditorGUILayout.LabelField(label, $"Unsupported element type: {type.Name}");
+            return value;
+        }
+
+        private object CreateDefault(Type type)
+        {
+            if (type.IsValueType) return Activator.CreateInstance(type);
+            return null;
+        }
+
     }
 }
 #endif
