@@ -29,12 +29,40 @@ namespace ReaCS.Runtime.Core
 
         public void SetPool(IPool pool) => _pool = pool;
 
+        private static string _pendingName;
+        private static bool _hasPendingName;
+
+        /// <summary>
+        /// Used internally to assign a name to a ScriptableObject right after instantiation.
+        /// Wrap this in a `using` block for safety.
+        /// </summary>
+        public readonly struct NameInjectionScope : IDisposable
+        {
+            public NameInjectionScope(string name)
+            {
+                _pendingName = name;
+                _hasPendingName = true;
+            }
+
+            public void Dispose()
+            {
+                _pendingName = null;
+                _hasPendingName = false;
+            }
+        }
+
 #if UNITY_EDITOR
         private static readonly Dictionary<ObservableObject, Dictionary<string, object>> _defaultValueCache = new();
 #endif
 
         public virtual void OnEnable()
         {
+            if (_hasPendingName && !string.IsNullOrEmpty(_pendingName))
+            {
+                this.name = _pendingName;
+                _pendingName = null;
+                _hasPendingName = false;
+            }
             InitializeFields();
             Register();
 

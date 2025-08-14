@@ -74,4 +74,9 @@ namespace ReaCS.Runtime.Core
         int FastHashValue { get; }
     }
 
+    public interface IObservableObjectFactory
+    {
+        T Create<T>(string name = null, EntityId? entityId = null) where T : ObservableObject;
+    }
+
 }
