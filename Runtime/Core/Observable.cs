@@ -1,6 +1,8 @@
 ﻿using ReaCS.Runtime.Internal;
 using ReaCS.Runtime.Registries;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Unity.Collections;
 using Unity.Properties;
 using UnityEngine;
@@ -57,7 +59,7 @@ namespace ReaCS.Runtime.Core
 #if UNITY_EDITOR
                 if (ObservablePlayModeGuard.Suppress) { _value = value; return; }
 #endif
-                if (!Equals(_value, value))
+                if (!AreEqual(_value, value))
                 {
                     var old = _value;
                     _value = value;
@@ -75,6 +77,23 @@ namespace ReaCS.Runtime.Core
 #endif
                 }
             }
+        }
+
+        internal static bool AreEqual<T>(T oldValue, T newValue)
+        {
+            if (typeof(T).IsGenericType)
+            {
+                var typeDef = typeof(T).GetGenericTypeDefinition();
+
+                if (typeDef == typeof(List<>) || typeDef == typeof(HashSet<>))
+                {
+                    var oldEnum = ((System.Collections.IEnumerable)oldValue)?.Cast<object>().ToList();
+                    var newEnum = ((System.Collections.IEnumerable)newValue)?.Cast<object>().ToList();
+                    return oldEnum?.SequenceEqual(newEnum) ?? newEnum == null;
+                }
+            }
+
+            return Equals(oldValue, newValue);
         }
 
         // ───────────────────────────────
