@@ -458,15 +458,40 @@ namespace ReaCS.Runtime.Core
                     var targetObs = field.GetValue(this);
                     if (sourceObs == null || targetObs == null) continue;
 
+                    // 1) Read ShouldPersist from snapshot & target
                     bool sourcePersist = cached.ShouldPersistField != null &&
                                          (bool)(cached.ShouldPersistField.GetValue(sourceObs) ?? false);
                     bool targetPersist = cached.ShouldPersistField != null &&
                                          (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
 
-                    if (sourcePersist || targetPersist)
+                    // 2) Apply ShouldPersist from snapshot to target (so authored/previous choice survives)
+                    if (cached.ShouldPersistField != null && sourcePersist != targetPersist)
+                    {
+                        ObservablePlayModeGuard.Suppress = true;
+                        try
+                        {
+                            cached.ShouldPersistField.SetValue(targetObs, sourcePersist);
+                        }
+                        finally
+                        {
+                            ObservablePlayModeGuard.Suppress = false;
+                        }
+                        targetPersist = sourcePersist; // keep our local view in sync
+                    }
+
+                    // 3) If this observable should persist, copy its Value from snapshot
+                    if (targetPersist)
                     {
                         var value = cached.ValueProperty?.GetValue(sourceObs);
-                        cached.ValueProperty?.SetValue(targetObs, value);
+                        ObservablePlayModeGuard.Suppress = true;
+                        try
+                        {
+                            cached.ValueProperty?.SetValue(targetObs, value);
+                        }
+                        finally
+                        {
+                            ObservablePlayModeGuard.Suppress = false;
+                        }
                     }
                 }
 
