@@ -32,6 +32,9 @@ namespace ReaCS.Runtime.Core
         private static string _pendingName;
         private static bool _hasPendingName;
 
+        // inside ObservableObject class
+        private static bool _isJsonCloneConstruction = false;
+
         /// <summary>
         /// Used internally to assign a name to a ScriptableObject right after instantiation.
         /// Wrap this in a `using` block for safety.
@@ -63,6 +66,11 @@ namespace ReaCS.Runtime.Core
                 _pendingName = null;
                 _hasPendingName = false;
             }
+
+            // Skip normal lifecycle for JSON clones
+            if (_isJsonCloneConstruction)
+                return;
+
             InitializeFields();
             Register();
 
@@ -344,11 +352,17 @@ namespace ReaCS.Runtime.Core
                 }
 
                 var json = File.ReadAllText(path);
+
+                // Create clone without registering/initializing
+                _isJsonCloneConstruction = true;
                 var clone = ScriptableObject.CreateInstance(GetType()) as ObservableObject;
+                _isJsonCloneConstruction = false;
                 if (clone == null) return;
 
+                clone.hideFlags = HideFlags.HideAndDontSave; // keep it invisible
                 JsonUtility.FromJsonOverwrite(json, clone);
 
+                // Copy back persisted fields based on the SNAPSHOT's flag
                 foreach (var cached in _observedFields)
                 {
                     var field = cached.Field;
@@ -356,17 +370,22 @@ namespace ReaCS.Runtime.Core
                     var targetObs = field.GetValue(this);
                     if (sourceObs == null || targetObs == null) continue;
 
-                    bool shouldPersist = cached.ShouldPersistField != null &&
+                    bool sourcePersist = cached.ShouldPersistField != null &&
+                                         (bool)(cached.ShouldPersistField.GetValue(sourceObs) ?? false);
+                    bool targetPersist = cached.ShouldPersistField != null &&
                                          (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
 
-                    if (shouldPersist)
+                    // Ensure target gets the persisted flag from file (so next loads work)
+                    if (cached.ShouldPersistField != null && sourcePersist != targetPersist)
+                        cached.ShouldPersistField.SetValue(targetObs, sourcePersist);
+
+                    if (sourcePersist || targetPersist)
                     {
                         var value = cached.ValueProperty?.GetValue(sourceObs);
                         cached.ValueProperty?.SetValue(targetObs, value);
                     }
                 }
 
-                ObservableRegistry.Unregister(clone);
 #if UNITY_EDITOR
                 DestroyImmediate(clone);
 #else
@@ -386,6 +405,7 @@ namespace ReaCS.Runtime.Core
                 _isLoadingJson = false;
             }
         }
+
 
 
 #if UNITY_EDITOR
