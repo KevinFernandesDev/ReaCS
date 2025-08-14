@@ -77,6 +77,23 @@ namespace ReaCS.Runtime.Core
     public interface IObservableObjectFactory
     {
         T Create<T>(string name = null, EntityId? entityId = null) where T : ObservableObject;
+
+        /// <summary>
+        /// Deletes the saved JSON state for this instance (if any).
+        /// </summary>
+        bool DeleteState(ObservableObject instance, bool log = true);
+
+        /// <summary>
+        /// Destroys the runtime instance. If deleteState = true, also deletes its JSON snapshot.
+        /// Won't write a final save on destroy.
+        /// </summary>
+        void Destroy(ObservableObject instance, bool deleteState = true, bool log = true);
+
+        /// <summary>
+        /// Utility: purge all snapshot files on disk (persistentDataPath + Temp in Editor).
+        /// Returns the number of files deleted.
+        /// </summary>
+        int PurgeAllSnapshots(bool log = true);
     }
 
 }

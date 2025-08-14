@@ -34,6 +34,8 @@ namespace ReaCS.Runtime.Core
 
         [NonSerialized] private bool _isSnapshotClone;
         private static int _jsonCloneGuard; // counts nested clone constructions
+                                           
+        [NonSerialized] private bool _suppressSaveOnDisable;
 
         /// <summary>
         /// Used internally to assign a name to a ScriptableObject right after instantiation.
@@ -89,16 +91,20 @@ namespace ReaCS.Runtime.Core
 
         protected virtual void OnDisable()
         {
-            if (_isSnapshotClone) return;   // <-- skip for JSON clones
+            if (_isSnapshotClone) return;
 
             Unregister();
 
 #if UNITY_EDITOR
-            if (EditorApplication.isPlaying)
+            if (EditorApplication.isPlaying && !_suppressSaveOnDisable)
                 SaveStateToJson();
 #else
-    SaveStateToJson();
+             if (!_suppressSaveOnDisable)
+                SaveStateToJson();
 #endif
+
+            // reset one-shot suppression
+            _suppressSaveOnDisable = false;
         }
 
 #if UNITY_EDITOR
@@ -415,6 +421,36 @@ namespace ReaCS.Runtime.Core
             }
         }
 
+        /// <summary>
+        /// Deletes the JSON snapshot for this instance (and clears the version key).
+        /// </summary>
+        public bool DeleteStateOnDisk(bool log = true)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    if (log) Debug.LogWarning("[ReaCS] DeleteStateOnDisk skipped: object has no name.");
+                    return false;
+                }
+
+                string path = GetSavePath();
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                    if (log) Debug.Log($"[ReaCS] Deleted snapshot: {path}");
+                }
+
+                PlayerPrefs.DeleteKey(name + "_snapshot_version");
+                PlayerPrefs.Save();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ReaCS] DeleteStateOnDisk failed for '{name}': {ex}");
+                return false;
+            }
+        }
 
 
 #if UNITY_EDITOR
