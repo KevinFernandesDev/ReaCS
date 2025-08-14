@@ -56,13 +56,42 @@ namespace ReaCS.Runtime.Core
             }
         }
 
+        // --- pending GUID injection (like NameInjectionScope) ---
+        private static string _pendingGuid;
+        private static bool _hasPendingGuid;
+
+        public readonly struct GuidInjectionScope : IDisposable
+        {
+            private readonly bool _armed;
+            public GuidInjectionScope(string guid)
+            {
+                if (!string.IsNullOrEmpty(guid))
+                {
+                    _pendingGuid = guid;
+                    _hasPendingGuid = true;
+                    _armed = true;
+                }
+                else _armed = false;
+            }
+            public void Dispose()
+            {
+                if (_armed)
+                {
+                    _pendingGuid = null;
+                    _hasPendingGuid = false;
+                }
+            }
+        }
+
+
+
 #if UNITY_EDITOR
         private static readonly Dictionary<ObservableObject, Dictionary<string, object>> _defaultValueCache = new();
 #endif
 
         public virtual void OnEnable()
         {
-            // Apply factory-injected name (if any)
+            // apply injected name
             if (_hasPendingName && !string.IsNullOrEmpty(_pendingName))
             {
                 this.name = _pendingName;
@@ -70,11 +99,19 @@ namespace ReaCS.Runtime.Core
                 _hasPendingName = false;
             }
 
-            // Mark JSON clones & skip lifecycle
+            // apply injected GUID (BEFORE EnsurePersistentGuid)
+            if (_hasPendingGuid && !string.IsNullOrEmpty(_pendingGuid))
+            {
+                persistentGuid = _pendingGuid;
+                _pendingGuid = null;
+                _hasPendingGuid = false;
+            }
+
+            // mark JSON clones / early returns etc...
             if (_jsonCloneGuard > 0) { _isSnapshotClone = true; return; }
             if (_isSnapshotClone) return;
 
-            EnsurePersistentGuid();
+            EnsurePersistentGuid(); // generates if still empty
 
             InitializeFields();
             Register();
@@ -83,7 +120,7 @@ namespace ReaCS.Runtime.Core
             if (EditorApplication.isPlaying)
                 LoadStateFromJson();
 #else
-            LoadStateFromJson();
+    LoadStateFromJson();
 #endif
         }
 
@@ -134,7 +171,7 @@ namespace ReaCS.Runtime.Core
 
         // ---------------- GUID + PATHS ----------------
 
-        private void EnsurePersistentGuid()
+        public void EnsurePersistentGuid()
         {
             if (string.IsNullOrEmpty(persistentGuid))
             {

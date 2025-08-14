@@ -9,11 +9,17 @@ namespace ReaCS.Runtime.Services
 {
     public class ObservableObjectFactory : IObservableObjectFactory, IReaCSService
     {
-        public T Create<T>(string name = null, EntityId? entityId = null) where T : ObservableObject
+        public T Create<T>(string name = null, string guid = null, EntityId? entityId = null)
+           where T : ObservableObject
         {
             using (new ObservableObject.NameInjectionScope(name ?? typeof(T).Name))
+            using (new ObservableObject.GuidInjectionScope(guid))
             {
                 var instance = ScriptableObject.CreateInstance<T>();
+
+                // Belt & suspenders: if OnEnable didn’t set it (shouldn’t happen), ensure now.
+                if (string.IsNullOrEmpty((instance as ObservableObject)?.PersistentGuid))
+                    instance.EnsurePersistentGuid();
 
                 if (entityId.HasValue)
                     instance.entityId = entityId.Value;
@@ -109,7 +115,5 @@ namespace ReaCS.Runtime.Services
             PlayerPrefs.Save();
             return count;
         }
-    }
-}
     }
 }

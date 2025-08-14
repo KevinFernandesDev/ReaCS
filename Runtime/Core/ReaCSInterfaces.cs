@@ -76,7 +76,7 @@ namespace ReaCS.Runtime.Core
 
     public interface IObservableObjectFactory
     {
-        T Create<T>(string name = null, EntityId? entityId = null) where T : ObservableObject;
+        T Create<T>(string name = null, string guid = null, EntityId? entityId = null) where T : ObservableObject;
 
         /// <summary>
         /// Deletes the saved JSON state for this instance (if any).
