@@ -84,6 +84,10 @@ namespace ReaCS.Runtime.Core
 
         protected virtual void OnDisable()
         {
+            // Skip normal lifecycle for JSON clones
+            if (_isJsonCloneConstruction)
+                return;
+
             Unregister();
 
 #if UNITY_EDITOR
