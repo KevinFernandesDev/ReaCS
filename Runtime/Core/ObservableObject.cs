@@ -277,32 +277,69 @@ namespace ReaCS.Runtime.Core
 #endif
         }
 
-        public void SaveStateToJson()
+        public void SaveStateToJson(bool log = true)
         {
-            var json = JsonUtility.ToJson(this);
-            File.WriteAllText(GetSavePath(), json);
-            PlayerPrefs.SetInt(name + "_snapshot_version", snapshotVersion);
+            try
+            {
+                if (string.IsNullOrEmpty(name))
+                {
+                    Debug.LogError($"[ReaCS] {GetType().Name} has no name — cannot save. Use the factory or set .name before saving.");
+                    return;
+                }
+
+                var path = GetSavePath();
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                var json = JsonUtility.ToJson(this);
+                File.WriteAllText(path, json);
+
+                PlayerPrefs.SetInt(name + "_snapshot_version", snapshotVersion);
+                PlayerPrefs.Save();
+
+#if UNITY_EDITOR
+                if (log) Debug.Log($"[ReaCS] Saved '{name}' to:\n{path}");
+#endif
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ReaCS] Failed to save '{name}': {ex}");
+            }
         }
 
         private static bool _isLoadingJson = false;
 
-        public void LoadStateFromJson()
+        public void LoadStateFromJson(bool log = true)
         {
             if (_isLoadingJson) return;
             _isLoadingJson = true;
 
             try
             {
+                if (string.IsNullOrEmpty(name))
+                {
+                    if (log) Debug.LogWarning($"[ReaCS] {GetType().Name} has no name on load — skipping.");
+                    return;
+                }
+
                 string path = GetSavePath();
-                if (!File.Exists(path)) return;
+                if (!File.Exists(path))
+                {
+#if UNITY_EDITOR
+                    if (log) Debug.Log($"[ReaCS] No save found for '{name}' at {path}");
+#endif
+                    return;
+                }
 
                 string versionKey = name + "_snapshot_version";
                 int savedVersion = PlayerPrefs.GetInt(versionKey, -1);
                 if (savedVersion != snapshotVersion)
                 {
+                    if (log) Debug.Log($"[ReaCS] Snapshot invalidated for {name} (v{savedVersion} → v{snapshotVersion}). Deleting.");
                     File.Delete(path);
                     PlayerPrefs.SetInt(versionKey, snapshotVersion);
-                    Debug.Log($"[ReaCS] Snapshot invalidated for {name} (v{savedVersion} → v{snapshotVersion})");
+                    PlayerPrefs.Save();
                     return;
                 }
 
@@ -317,7 +354,6 @@ namespace ReaCS.Runtime.Core
                     var field = cached.Field;
                     var sourceObs = field.GetValue(clone);
                     var targetObs = field.GetValue(this);
-
                     if (sourceObs == null || targetObs == null) continue;
 
                     bool shouldPersist = cached.ShouldPersistField != null &&
@@ -334,14 +370,23 @@ namespace ReaCS.Runtime.Core
 #if UNITY_EDITOR
                 DestroyImmediate(clone);
 #else
-                Destroy(clone);
+        Destroy(clone);
 #endif
+
+#if UNITY_EDITOR
+                if (log) Debug.Log($"[ReaCS] Loaded '{name}' from:\n{path}");
+#endif
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[ReaCS] Failed to load '{name}': {ex}");
             }
             finally
             {
                 _isLoadingJson = false;
             }
         }
+
 
 #if UNITY_EDITOR
         public void BumpSnapshotVersion()
