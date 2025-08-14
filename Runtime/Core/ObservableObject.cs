@@ -32,8 +32,8 @@ namespace ReaCS.Runtime.Core
         private static string _pendingName;
         private static bool _hasPendingName;
 
-        // inside ObservableObject class
-        private static bool _isJsonCloneConstruction = false;
+        [NonSerialized] private bool _isSnapshotClone;
+        private static int _jsonCloneGuard; // counts nested clone constructions
 
         /// <summary>
         /// Used internally to assign a name to a ScriptableObject right after instantiation.
@@ -60,6 +60,7 @@ namespace ReaCS.Runtime.Core
 
         public virtual void OnEnable()
         {
+            // assign factory-injected name
             if (_hasPendingName && !string.IsNullOrEmpty(_pendingName))
             {
                 this.name = _pendingName;
@@ -67,9 +68,13 @@ namespace ReaCS.Runtime.Core
                 _hasPendingName = false;
             }
 
-            // Skip normal lifecycle for JSON clones
-            if (_isJsonCloneConstruction)
+            // If we are constructing a JSON clone, mark & skip lifecycle
+            if (_jsonCloneGuard > 0)
+            {
+                _isSnapshotClone = true;
                 return;
+            }
+            if (_isSnapshotClone) return;
 
             InitializeFields();
             Register();
@@ -84,9 +89,7 @@ namespace ReaCS.Runtime.Core
 
         protected virtual void OnDisable()
         {
-            // Skip normal lifecycle for JSON clones
-            if (_isJsonCloneConstruction)
-                return;
+            if (_isSnapshotClone) return;   // <-- skip for JSON clones
 
             Unregister();
 
@@ -94,7 +97,7 @@ namespace ReaCS.Runtime.Core
             if (EditorApplication.isPlaying)
                 SaveStateToJson();
 #else
-            SaveStateToJson();
+    SaveStateToJson();
 #endif
         }
 
@@ -357,16 +360,18 @@ namespace ReaCS.Runtime.Core
 
                 var json = File.ReadAllText(path);
 
-                // Create clone without registering/initializing
-                _isJsonCloneConstruction = true;
+                // Create clone without running normal lifecycle
+                _jsonCloneGuard++;
                 var clone = ScriptableObject.CreateInstance(GetType()) as ObservableObject;
-                _isJsonCloneConstruction = false;
+                _jsonCloneGuard--;
                 if (clone == null) return;
 
-                clone.hideFlags = HideFlags.HideAndDontSave; // keep it invisible
+                clone._isSnapshotClone = true;
+                clone.hideFlags = HideFlags.HideAndDontSave;
+
                 JsonUtility.FromJsonOverwrite(json, clone);
 
-                // Copy back persisted fields based on the SNAPSHOT's flag
+                // Copy back persisted fields (read flag from snapshot/source)
                 foreach (var cached in _observedFields)
                 {
                     var field = cached.Field;
@@ -379,7 +384,7 @@ namespace ReaCS.Runtime.Core
                     bool targetPersist = cached.ShouldPersistField != null &&
                                          (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
 
-                    // Ensure target gets the persisted flag from file (so next loads work)
+                    // Keep target’s flag in sync with file so next loads work even before user sets it
                     if (cached.ShouldPersistField != null && sourcePersist != targetPersist)
                         cached.ShouldPersistField.SetValue(targetObs, sourcePersist);
 
@@ -393,7 +398,7 @@ namespace ReaCS.Runtime.Core
 #if UNITY_EDITOR
                 DestroyImmediate(clone);
 #else
-        Destroy(clone);
+                Destroy(clone);
 #endif
 
 #if UNITY_EDITOR
