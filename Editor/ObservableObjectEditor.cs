@@ -27,6 +27,8 @@ namespace ReaCS.Editor
         // --- Smart String Editor-only variable storage ---
         private Dictionary<string, string> smartVarValues = new();
         private Dictionary<string, UnityEngine.Object> smartVarObjects = new();
+        // Add near your other fields in ObservableObjectEditor
+        private readonly Dictionary<string, bool> _foldoutStates = new();
 
         protected virtual void OnEnable()
         {
@@ -550,6 +552,11 @@ namespace ReaCS.Editor
                 }
             }
 
+            // --- Generic struct support for Observable<T> where T is a struct ---
+            if (type != null && type.IsValueType && !type.IsPrimitive && !type.IsEnum)
+            {
+                return DrawStruct(label, value, type, 0);
+            }
 
             // --- Standard primitives ---
             if (value is float rawFloatVal)
@@ -625,8 +632,15 @@ namespace ReaCS.Editor
 #endif
         }
 
-        private object DrawSingleValue(string label, object value, Type type)
+        private object DrawSingleValue(string label, object value, Type type, int depth = 0)
         {
+            // UnityEngine.Object support (lets lists of Objects work)
+            if (typeof(UnityEngine.Object).IsAssignableFrom(type))
+            {
+                return EditorGUILayout.ObjectField(label, value as UnityEngine.Object, type, false);
+            }
+
+            // Primitives & basics
             if (type == typeof(string))
                 return EditorGUILayout.TextField(label, value as string ?? "");
             if (type == typeof(int))
@@ -635,23 +649,88 @@ namespace ReaCS.Editor
                 return EditorGUILayout.FloatField(label, value is float f ? f : 0f);
             if (type == typeof(bool))
                 return EditorGUILayout.Toggle(label, value is bool b && b);
+            if (type.IsEnum)
+                return EditorGUILayout.EnumPopup(label, value is Enum e ? e : (Enum)Activator.CreateInstance(type));
+
+            // Common Unity structs
             if (type == typeof(Vector2))
-                return EditorGUILayout.Vector2Field(label, value is Vector2 v ? v : Vector2.zero);
+                return EditorGUILayout.Vector2Field(label, value is Vector2 v2 ? v2 : Vector2.zero);
             if (type == typeof(Vector3))
-                return EditorGUILayout.Vector3Field(label, value is Vector3 v ? v : Vector3.zero);
+                return EditorGUILayout.Vector3Field(label, value is Vector3 v3 ? v3 : Vector3.zero);
+            if (type == typeof(Vector4))
+                return EditorGUILayout.Vector4Field(label, value is Vector4 v4 ? v4 : Vector4.zero);
+            if (type == typeof(Quaternion))
+            {
+                var q = value is Quaternion qv ? qv : Quaternion.identity;
+                Vector4 raw = new(q.x, q.y, q.z, q.w);
+                Vector4 newRaw = EditorGUILayout.Vector4Field(label + " (xyzw)", raw);
+                return new Quaternion(newRaw.x, newRaw.y, newRaw.z, newRaw.w);
+            }
             if (type == typeof(Color))
                 return EditorGUILayout.ColorField(label, value is Color c ? c : Color.white);
-            if (type.IsEnum)
-                return EditorGUILayout.EnumPopup(label, (Enum)value);
 
+            // 🔹 Generic struct support: any [Serializable] struct (value type, non-primitive, non-enum)
+            if (type.IsValueType && !type.IsPrimitive && !type.IsEnum)
+            {
+                return DrawStruct(label, value, type, depth);
+            }
+
+            // Fallback
             EditorGUILayout.LabelField(label, $"Unsupported element type: {type.Name}");
             return value;
         }
+
 
         private object CreateDefault(Type type)
         {
             if (type.IsValueType) return Activator.CreateInstance(type);
             return null;
+        }
+
+        private static IEnumerable<FieldInfo> GetInspectableFields(Type t)
+        {
+            const BindingFlags flags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            return t.GetFields(flags)
+                    .Where(f =>
+                        (f.IsPublic || f.GetCustomAttribute<SerializeField>() != null) &&
+                        !f.IsDefined(typeof(NonSerializedAttribute), inherit: true));
+        }
+
+        private object DrawStruct(string label, object value, Type type, int depth = 0)
+        {
+            if (value == null) value = Activator.CreateInstance(type);
+
+            string key = $"{label}|{type.FullName}";
+            bool open = _foldoutStates.TryGetValue(key, out var s) ? s : true;
+            open = EditorGUILayout.Foldout(open, $"{label} ({type.Name})", true);
+            _foldoutStates[key] = open;
+
+            if (!open) return value;
+
+            // Safety: avoid runaway recursion
+            if (depth > 6)
+            {
+                EditorGUILayout.LabelField("Depth limit reached...");
+                return value;
+            }
+
+            EditorGUI.indentLevel++;
+            object boxed = value; // boxed copy of the struct
+
+            foreach (var f in GetInspectableFields(type))
+            {
+                string childLabel = ObjectNames.NicifyVariableName(f.Name);
+                object current = f.GetValue(boxed);
+                object updated = DrawSingleValue(childLabel, current, f.FieldType, depth + 1);
+                if (!Equals(updated, current))
+                {
+                    // This writes into the boxed struct copy
+                    f.SetValue(boxed, updated);
+                }
+            }
+
+            EditorGUI.indentLevel--;
+            return boxed;
         }
 
     }
