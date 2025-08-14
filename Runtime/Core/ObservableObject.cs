@@ -22,6 +22,15 @@ namespace ReaCS.Runtime.Core
         [SerializeField, HideInInspector] private int snapshotVersion = 1;
         public int SnapshotVersion => snapshotVersion;
 
+        // Stable, serialized GUID per instance (used for filenames & version keys)
+        [SerializeField, HideInInspector] private string persistentGuid;
+        public string PersistentGuid => persistentGuid;
+
+        // Guards
+        [NonSerialized] private bool _isSnapshotClone;
+        private static int _jsonCloneGuard;
+        [NonSerialized] private bool _suppressSaveOnDisable;
+
         private static readonly Dictionary<Type, List<CachedFieldInfo>> _fieldCache = new();
         private List<CachedFieldInfo> _observedFields;
         private Dictionary<string, object> _cachedValues = new();
@@ -29,18 +38,10 @@ namespace ReaCS.Runtime.Core
 
         public void SetPool(IPool pool) => _pool = pool;
 
+        // Name injection (used by factory to set .name before OnEnable runs)
         private static string _pendingName;
         private static bool _hasPendingName;
 
-        [NonSerialized] private bool _isSnapshotClone;
-        private static int _jsonCloneGuard; // counts nested clone constructions
-                                           
-        [NonSerialized] private bool _suppressSaveOnDisable;
-
-        /// <summary>
-        /// Used internally to assign a name to a ScriptableObject right after instantiation.
-        /// Wrap this in a `using` block for safety.
-        /// </summary>
         public readonly struct NameInjectionScope : IDisposable
         {
             public NameInjectionScope(string name)
@@ -48,7 +49,6 @@ namespace ReaCS.Runtime.Core
                 _pendingName = name;
                 _hasPendingName = true;
             }
-
             public void Dispose()
             {
                 _pendingName = null;
@@ -62,7 +62,7 @@ namespace ReaCS.Runtime.Core
 
         public virtual void OnEnable()
         {
-            // assign factory-injected name
+            // Apply factory-injected name (if any)
             if (_hasPendingName && !string.IsNullOrEmpty(_pendingName))
             {
                 this.name = _pendingName;
@@ -70,13 +70,11 @@ namespace ReaCS.Runtime.Core
                 _hasPendingName = false;
             }
 
-            // If we are constructing a JSON clone, mark & skip lifecycle
-            if (_jsonCloneGuard > 0)
-            {
-                _isSnapshotClone = true;
-                return;
-            }
+            // Mark JSON clones & skip lifecycle
+            if (_jsonCloneGuard > 0) { _isSnapshotClone = true; return; }
             if (_isSnapshotClone) return;
+
+            EnsurePersistentGuid();
 
             InitializeFields();
             Register();
@@ -99,11 +97,9 @@ namespace ReaCS.Runtime.Core
             if (EditorApplication.isPlaying && !_suppressSaveOnDisable)
                 SaveStateToJson();
 #else
-             if (!_suppressSaveOnDisable)
+            if (!_suppressSaveOnDisable)
                 SaveStateToJson();
 #endif
-
-            // reset one-shot suppression
             _suppressSaveOnDisable = false;
         }
 
@@ -136,6 +132,52 @@ namespace ReaCS.Runtime.Core
         public abstract void RegisterSelf();
         public abstract void UnregisterSelf();
 
+        // ---------------- GUID + PATHS ----------------
+
+        private void EnsurePersistentGuid()
+        {
+            if (string.IsNullOrEmpty(persistentGuid))
+            {
+                persistentGuid = System.Guid.NewGuid().ToString("N");
+#if UNITY_EDITOR
+                // Persist into asset if this is an asset instance
+                EditorUtility.SetDirty(this);
+#endif
+            }
+        }
+
+        private string GetSaveDirectory()
+        {
+#if UNITY_EDITOR
+            return EditorApplication.isPlaying
+                ? Application.persistentDataPath
+                : Path.Combine(Directory.GetCurrentDirectory(), "Temp");
+#else
+            return Application.persistentDataPath;
+#endif
+        }
+
+        private string GetFileSuffix()
+        {
+#if UNITY_EDITOR
+            return EditorApplication.isPlaying ? "_state.json" : "_snapshot.json";
+#else
+            return "_state.json";
+#endif
+        }
+
+        private string ComposeGuidPath()
+        {
+            var dir = GetSaveDirectory();
+            var suffix = GetFileSuffix();
+            var file = $"{name}_{persistentGuid}{suffix}";
+            return Path.Combine(dir, file);
+        }
+
+        private string GetVersionKey() => $"{persistentGuid}_snapshot_version";
+
+        // ---------------- Observable field setup ----------------
+
         private void InitializeFields()
         {
             Type type = GetType();
@@ -148,7 +190,8 @@ namespace ReaCS.Runtime.Core
                     if (!Attribute.IsDefined(field, typeof(ObservableAttribute))) continue;
 
                     var valueProp = field.FieldType.GetProperty("Value");
-                    var persistField = field.FieldType.GetField("ShouldPersist", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                    var persistField = field.FieldType.GetField("ShouldPersist",
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
                     cachedFields.Add(new CachedFieldInfo
                     {
@@ -287,28 +330,20 @@ namespace ReaCS.Runtime.Core
         }
 #endif
 
-        private string GetSavePath()
-        {
-#if UNITY_EDITOR
-            return EditorApplication.isPlaying
-                ? Path.Combine(Application.persistentDataPath, name + "_state.json")
-                : Path.Combine("Temp", name + "_snapshot.json");
-#else
-            return Path.Combine(Application.persistentDataPath, name + "_state.json");
-#endif
-        }
+        // ---------------- Save / Load (GUID-only) ----------------
 
-        public void SaveStateToJson(bool log = false)
+        public void SaveStateToJson(bool log = true)
         {
             try
             {
                 if (string.IsNullOrEmpty(name))
                 {
-                    Debug.LogError($"[ReaCS] {GetType().Name} has no name — cannot save. Use the factory or set .name before saving.");
+                    Debug.LogError($"[ReaCS] {GetType().Name} has no name — cannot save.");
                     return;
                 }
+                EnsurePersistentGuid();
 
-                var path = GetSavePath();
+                var path = ComposeGuidPath();
                 var dir = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
@@ -316,11 +351,11 @@ namespace ReaCS.Runtime.Core
                 var json = JsonUtility.ToJson(this);
                 File.WriteAllText(path, json);
 
-                PlayerPrefs.SetInt(name + "_snapshot_version", snapshotVersion);
+                PlayerPrefs.SetInt(GetVersionKey(), snapshotVersion);
                 PlayerPrefs.Save();
 
 #if UNITY_EDITOR
-                if (log) Debug.Log($"[ReaCS] Saved '{name}' to:\n{path}");
+                if (log) Debug.Log($"[ReaCS] Saved '{name}' ({persistentGuid}) → {path}");
 #endif
             }
             catch (Exception ex)
@@ -331,7 +366,7 @@ namespace ReaCS.Runtime.Core
 
         private static bool _isLoadingJson = false;
 
-        public void LoadStateFromJson(bool log = false)
+        public void LoadStateFromJson(bool log = true)
         {
             if (_isLoadingJson) return;
             _isLoadingJson = true;
@@ -344,29 +379,30 @@ namespace ReaCS.Runtime.Core
                     return;
                 }
 
-                string path = GetSavePath();
+                EnsurePersistentGuid();
+
+                string path = ComposeGuidPath();
                 if (!File.Exists(path))
                 {
 #if UNITY_EDITOR
-                    if (log) Debug.Log($"[ReaCS] No save found for '{name}' at {path}");
+                    if (log) Debug.Log($"[ReaCS] No save found for '{name}' ({persistentGuid}) at {path}");
 #endif
                     return;
                 }
 
-                string versionKey = name + "_snapshot_version";
-                int savedVersion = PlayerPrefs.GetInt(versionKey, -1);
+                int savedVersion = PlayerPrefs.GetInt(GetVersionKey(), -1);
                 if (savedVersion != snapshotVersion)
                 {
-                    if (log) Debug.Log($"[ReaCS] Snapshot invalidated for {name} (v{savedVersion} → v{snapshotVersion}). Deleting.");
+                    if (log) Debug.Log($"[ReaCS] Snapshot invalidated for {name} ({persistentGuid}) (v{savedVersion} → v{snapshotVersion}). Deleting.");
                     File.Delete(path);
-                    PlayerPrefs.SetInt(versionKey, snapshotVersion);
+                    PlayerPrefs.SetInt(GetVersionKey(), snapshotVersion);
                     PlayerPrefs.Save();
                     return;
                 }
 
                 var json = File.ReadAllText(path);
 
-                // Create clone without running normal lifecycle
+                // Create inert clone to import JSON
                 _jsonCloneGuard++;
                 var clone = ScriptableObject.CreateInstance(GetType()) as ObservableObject;
                 _jsonCloneGuard--;
@@ -377,7 +413,7 @@ namespace ReaCS.Runtime.Core
 
                 JsonUtility.FromJsonOverwrite(json, clone);
 
-                // Copy back persisted fields (read flag from snapshot/source)
+                // Copy persisted fields from snapshot into this instance
                 foreach (var cached in _observedFields)
                 {
                     var field = cached.Field;
@@ -389,10 +425,6 @@ namespace ReaCS.Runtime.Core
                                          (bool)(cached.ShouldPersistField.GetValue(sourceObs) ?? false);
                     bool targetPersist = cached.ShouldPersistField != null &&
                                          (bool)(cached.ShouldPersistField.GetValue(targetObs) ?? false);
-
-                    // Keep target’s flag in sync with file so next loads work even before user sets it
-                    if (cached.ShouldPersistField != null && sourcePersist != targetPersist)
-                        cached.ShouldPersistField.SetValue(targetObs, sourcePersist);
 
                     if (sourcePersist || targetPersist)
                     {
@@ -408,7 +440,7 @@ namespace ReaCS.Runtime.Core
 #endif
 
 #if UNITY_EDITOR
-                if (log) Debug.Log($"[ReaCS] Loaded '{name}' from:\n{path}");
+                if (log) Debug.Log($"[ReaCS] Loaded '{name}' ({persistentGuid}) ← {path}");
 #endif
             }
             catch (Exception ex)
@@ -421,9 +453,6 @@ namespace ReaCS.Runtime.Core
             }
         }
 
-        /// <summary>
-        /// Deletes the JSON snapshot for this instance (and clears the version key).
-        /// </summary>
         public bool DeleteStateOnDisk(bool log = true)
         {
             try
@@ -433,15 +462,15 @@ namespace ReaCS.Runtime.Core
                     if (log) Debug.LogWarning("[ReaCS] DeleteStateOnDisk skipped: object has no name.");
                     return false;
                 }
+                EnsurePersistentGuid();
 
-                string path = GetSavePath();
+                string path = ComposeGuidPath();
                 if (File.Exists(path))
                 {
                     File.Delete(path);
                     if (log) Debug.Log($"[ReaCS] Deleted snapshot: {path}");
                 }
-
-                PlayerPrefs.DeleteKey(name + "_snapshot_version");
+                PlayerPrefs.DeleteKey(GetVersionKey());
                 PlayerPrefs.Save();
                 return true;
             }
@@ -452,6 +481,7 @@ namespace ReaCS.Runtime.Core
             }
         }
 
+        public void SuppressSaveOnDisableOnce() => _suppressSaveOnDisable = true;
 
 #if UNITY_EDITOR
         public void BumpSnapshotVersion()
@@ -462,6 +492,7 @@ namespace ReaCS.Runtime.Core
         }
 #endif
 
+        // ---------- helper struct ----------
         private class CachedFieldInfo
         {
             public FieldInfo Field;
