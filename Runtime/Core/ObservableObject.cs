@@ -292,7 +292,7 @@ namespace ReaCS.Runtime.Core
 #endif
         }
 
-        public void SaveStateToJson(bool log = true)
+        public void SaveStateToJson(bool log = false)
         {
             try
             {
@@ -325,7 +325,7 @@ namespace ReaCS.Runtime.Core
 
         private static bool _isLoadingJson = false;
 
-        public void LoadStateFromJson(bool log = true)
+        public void LoadStateFromJson(bool log = false)
         {
             if (_isLoadingJson) return;
             _isLoadingJson = true;
