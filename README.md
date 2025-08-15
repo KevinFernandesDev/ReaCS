@@ -156,4 +156,4 @@ Ready for zip upload.
 </br> 
 
 ## License
-No License
+All rights reserved
